@@ -1,4 +1,4 @@
-def get_class_name(label):
+def get_class_name_train(label):
     classes = [
         'SNMK',
         'c_4',
@@ -51,7 +51,7 @@ def get_class_name(label):
     ]
     return classes[label]
 
-def get_label(row, columns):
+def get_label_train(row, columns):
     classes = [
         'SNMK',
         'c_4',
@@ -111,3 +111,25 @@ def get_label(row, columns):
         raise ValueError("Unhandled case in get_label")
     
     return y_class
+
+def get_label_valid(row, columns):
+    classes = [
+        'Q',
+        'UNK'
+    ]
+    positives = list(columns[3:][row[1][3:] == 'POS'])
+    if len(positives) == 0:
+        y_class = classes.index('UNK')
+    elif len(positives) == 1:
+        y_class = classes.index(positives[0])
+    else:
+        raise ValueError("Unhandled case in get_label")
+    
+    return y_class
+
+def get_class_name_valid(label):
+    classes = [
+        'Q',
+        'UNK'
+    ]
+    return classes[label]

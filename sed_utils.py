@@ -4,6 +4,57 @@ import numpy as np
 
 import time
 
+def get_bioacoustic_pcen_conf():
+    return {
+	'gain' : 0.8,
+	'bias' : 10,
+	'power' : 0.25,
+	'time_constant' : 0.06,
+	'eps' : 1e-6    
+    }
+def get_speech_pcen_conf():
+    return {
+	'gain' : 0.98,
+	'bias' : 2,
+	'power' : 0.5,
+	'time_constant' : 0.4,
+	'eps' : 1e-6    
+    }
+
+def wav_to_pcen(wav, sample_rate, conf):
+    window_size = 256 # roughly 25 ms, as used when deriving default params for PCEN, int(sample_rate * 0.025)
+    hop_size    = 128 # roughly 10 ms, as used when deriving default params for PCEN, int(sample_rate * 0.010)
+    D = librosa.feature.melspectrogram(
+        wav, 
+        sr=sample_rate,
+        win_length=window_size,
+        hop_length=hop_size,
+        n_mels=40     # used to derive default params for PCEN
+    )
+    S_pcen = librosa.core.pcen(
+        D, 
+        sr=sample_rate,
+        gain=conf['gain'],
+        bias=conf['bias'],
+        power=conf['power'],
+        time_constant=conf['time_constant'],
+        eps=conf['eps']
+    )
+    return S_pcen
+
+def wav_to_mel(wav, sample_rate):
+    window_size = 256 # int(sample_rate * 0.025)
+    hop_size    = 128 # int(sample_rate * 0.010)
+    D = librosa.feature.melspectrogram(
+        wav, 
+        sr=sample_rate,
+        win_length=window_size,
+        hop_length=hop_size,
+        n_mels=40
+    )
+    S_db = librosa.power_to_db(np.abs(D), ref=np.max)
+    return S_db
+
 # TODO: Write a test for this
 def split_into_segments(wave, sample_rate, hop_size, window_size):
 
@@ -116,6 +167,7 @@ def get_segments_and_labels(wave, sample_rate, annotation_df, hop_size, window_s
     
 def load_wave(wav_path):
     wave, sample_rate = librosa.load(wav_path, sr=None)
+    wave = wave * (2**31) # rescale according to recommendation for PCEN in librosa
     return wave, sample_rate
 
 
