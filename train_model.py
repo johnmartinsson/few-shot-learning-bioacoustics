@@ -56,7 +56,7 @@ def evaluate(model, loader, loss_function):
 def main(base_train, base_valid, experiment_dir):
     # Model settings
     n_classes = 48
-    n_time    = 4
+    n_time    = 8 #4
 
     # Training settings
     epochs = 1000
@@ -64,10 +64,10 @@ def main(base_train, base_valid, experiment_dir):
     patience = 10
     batch_size = 64
     mode = 'train'
-    nb_runs = 5
+    nb_runs = 1 #5
 
     for idx_run in range(nb_runs):
-        experiment_path = os.path.join(experiment_dir, 'variation/run_{}'.format(idx_run))
+        experiment_path = os.path.join(experiment_dir, 'run_{}'.format(idx_run))
 
         if mode == "train":
 

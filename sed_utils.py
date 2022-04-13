@@ -117,7 +117,7 @@ def get_segment_annotation(segment_interval, annotation_interval, sample_rate, w
     segment_annotation[np.intersect1d(segment_indices, annotation_indices)] = 1
     return segment_annotation
     
-def get_segments_and_labels(wave, sample_rate, annotation_df, hop_size, window_size, n_classes, n_time, get_label_fn):
+def get_segments_and_labels(wave, sample_rate, annotation_df, n_shot, n_background, hop_size, window_size, n_classes, n_time, get_label_fn):
     
     segments, segment_intervals = split_into_segments(wave, sample_rate, hop_size, window_size)
         
@@ -125,6 +125,10 @@ def get_segments_and_labels(wave, sample_rate, annotation_df, hop_size, window_s
     
     segment_targets = np.zeros((len(segments), n_classes, n_time))
     annotation_intervals, labels = get_annotation_intervals_and_labels(annotation_df, get_label_fn)
+
+    # TODO: adding the possibility to only load the first n-shot annotations
+    annotation_intervals = annotation_intervals[:n_shot]
+    labels = labels[:n_shot]
 
     for seg_idx, segment_interval in enumerate(segment_intervals):
         for (annotation_interval, label) in zip(annotation_intervals, labels):
@@ -155,14 +159,14 @@ def get_segments_and_labels(wave, sample_rate, annotation_df, hop_size, window_s
     background_segment_targets = segment_targets[background_bool_idx,:,:]
     
     if len(background_segments) < len(signal_segments):
-        return signal_segments, signal_segment_targets, [], []
-    
-    # TODO: maybe thing a bit more about this. Mainly done to save memory space.
-    background_random_idx = np.random.choice(np.arange(len(background_segments)), len(signal_segments)) # sample as many as signals
-    background_segments = background_segments[background_random_idx]
-    background_segment_targets = background_segment_targets[background_random_idx]
-    
-    return signal_segments, signal_segment_targets, background_segments, background_segment_targets
+        return signal_segments, signal_segment_targets, background_segments, background_segment_targets
+    else:
+        # TODO: maybe think a bit more about this. Mainly done to save memory space.
+        background_random_idx = np.random.choice(np.arange(len(background_segments)), n_background) # sample background signals
+        background_segments = background_segments[background_random_idx]
+        background_segment_targets = background_segment_targets[background_random_idx]
+        
+        return signal_segments, signal_segment_targets, background_segments, background_segment_targets
 
     
 def load_wave(wav_path):
