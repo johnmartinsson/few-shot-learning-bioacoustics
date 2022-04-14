@@ -162,7 +162,8 @@ def get_segments_and_labels(wave, sample_rate, annotation_df, n_shot, n_backgrou
         return signal_segments, signal_segment_targets, background_segments, background_segment_targets
     else:
         # TODO: maybe think a bit more about this. Mainly done to save memory space.
-        background_random_idx = np.random.choice(np.arange(len(background_segments)), n_background) # sample background signals
+        n_sample = min(len(background_segments), n_background) # can only sample as many as there is
+        background_random_idx = np.random.choice(np.arange(len(background_segments)), n_sample, replace=False) # sample background signals
         background_segments = background_segments[background_random_idx]
         background_segment_targets = background_segment_targets[background_random_idx]
         

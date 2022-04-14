@@ -43,7 +43,7 @@ def get_first_audio_events(audio_file_path, annotation_df, event_class, event_ca
         audio_segment = audio[start_idx:end_idx]
         audio_segments.append(audio_segment)
         times.append((start_time, end_time))
-    return audio_segments, times
+    return audio_segments, times, sample_rate
         
 def play_random_audio_events(audio_file_path, annotation_df, event_class, event_category, n=5, expand=0):
     audio, sample_rate = librosa.load(audio_file_path, None)
