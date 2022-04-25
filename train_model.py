@@ -55,8 +55,8 @@ def evaluate(model, loader, loss_function):
 
 def main(base_train, base_valid, experiment_dir):
     # Model settings
-    n_classes = 48
-    n_time    = 8 #4
+    #n_classes = 48
+    #n_time    = 8 #4
 
     # Training settings
     epochs = 1000
@@ -66,6 +66,13 @@ def main(base_train, base_valid, experiment_dir):
     mode = 'train'
     nb_runs = 1 #5
 
+    (_x, _y) = base_train[0]
+    # set the target and input shape according to the provided data
+    n_classes = _y.shape[0]
+    n_time    = _y.shape[1]
+    n_mels    = _x.shape[0]
+    n_bins    = _x.shape[1]
+
     for idx_run in range(nb_runs):
         experiment_path = os.path.join(experiment_dir, 'run_{}'.format(idx_run))
 
@@ -73,10 +80,10 @@ def main(base_train, base_valid, experiment_dir):
 
             writer = torch.utils.tensorboard.SummaryWriter(log_dir=experiment_path)
 
-            model = models.get_model(n_classes, n_time).double()
+            model = models.get_model(n_classes, n_time, n_mels, n_bins).double()
             model = model.cuda()
             # just a copy of the model
-            best_model = models.get_model(n_classes, n_time).double()
+            best_model = models.get_model(n_classes, n_time, n_mels, n_bins).double()
             best_model = best_model.cuda()
 
             optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
@@ -110,6 +117,8 @@ def main(base_train, base_valid, experiment_dir):
                 # convergence criterion
                 if epoch - best_epoch >= patience or epoch >= epochs:
                     not_converged = False
+
+                # TODO: every nth epoch do a proper few-shot evaluation
 
             torch.save(model.state_dict(), os.path.join(experiment_path, "model_epochs_{}.ckpt".format(epoch)))
             torch.save(best_model.state_dict(), os.path.join(experiment_path, "best_model.ckpt"))
