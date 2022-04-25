@@ -21,15 +21,17 @@ def get_speech_pcen_conf():
 	'eps' : 1e-6    
     }
 
-def wav_to_pcen(wav, sample_rate, conf):
-    window_size = 256 # roughly 25 ms, as used when deriving default params for PCEN, int(sample_rate * 0.025)
-    hop_size    = 128 # roughly 10 ms, as used when deriving default params for PCEN, int(sample_rate * 0.010)
+def wav_to_pcen(wav, sample_rate, conf, n_mels=40):
+    window_size = 1*256 # roughly 25 ms, as used when deriving default params for PCEN, int(sample_rate * 0.025)
+    hop_size    = 1*128 # roughly 10 ms, as used when deriving default params for PCEN, int(sample_rate * 0.010)
+    n_fft       = 2*256 # roughly 25 ms
     D = librosa.feature.melspectrogram(
         wav, 
         sr=sample_rate,
         win_length=window_size,
+        n_fft=n_fft,
         hop_length=hop_size,
-        n_mels=40     # used to derive default params for PCEN
+        n_mels=n_mels     # used to derive default params for PCEN
     )
     S_pcen = librosa.core.pcen(
         D, 
@@ -42,20 +44,23 @@ def wav_to_pcen(wav, sample_rate, conf):
     )
     return S_pcen
 
-def wav_to_mel(wav, sample_rate):
-    window_size = 256 # int(sample_rate * 0.025)
-    hop_size    = 128 # int(sample_rate * 0.010)
+def wav_to_mel(wav, sample_rate, n_mels=40):
+    window_size = 1*256 # int(sample_rate * 0.025)
+    hop_size    = 1*128 # int(sample_rate * 0.010)
+    n_fft       = 2*256 # int(sample_rate * 0.025)
     D = librosa.feature.melspectrogram(
         wav, 
         sr=sample_rate,
         win_length=window_size,
+        n_fft=n_fft,
         hop_length=hop_size,
-        n_mels=40
+        n_mels=n_mels
     )
     S_db = librosa.power_to_db(np.abs(D), ref=np.max)
     return S_db
 
 # TODO: Write a test for this
+# TODO: What if we store the indices instead of the audio?
 def split_into_segments(wave, sample_rate, hop_size, window_size):
 
     N = len(wave)
@@ -119,9 +124,9 @@ def get_segment_annotation(segment_interval, annotation_interval, sample_rate, w
     
 def get_segments_and_labels(wave, sample_rate, annotation_df, n_shot, n_background, hop_size, window_size, n_classes, n_time, get_label_fn):
     
+    t1 = time.time()
     segments, segment_intervals = split_into_segments(wave, sample_rate, hop_size, window_size)
         
-    t1 = time.time()
     
     segment_targets = np.zeros((len(segments), n_classes, n_time))
     annotation_intervals, labels = get_annotation_intervals_and_labels(annotation_df, get_label_fn)
@@ -129,7 +134,10 @@ def get_segments_and_labels(wave, sample_rate, annotation_df, n_shot, n_backgrou
     # TODO: adding the possibility to only load the first n-shot annotations
     annotation_intervals = annotation_intervals[:n_shot]
     labels = labels[:n_shot]
+    t2 = time.time()
+    print("before nested loop time: ", t2-t1)
 
+    t1 = time.time()
     for seg_idx, segment_interval in enumerate(segment_intervals):
         for (annotation_interval, label) in zip(annotation_intervals, labels):
             iou = compute_interval_intersection_over_union(segment_interval, annotation_interval)
@@ -143,9 +151,12 @@ def get_segments_and_labels(wave, sample_rate, annotation_df, n_shot, n_backgrou
                 annotation = np.max(annotation_segments, axis=1)
                 
                 segment_targets[seg_idx, class_idx,:] += annotation
+    t2 = time.time()
+    print("nested loop time: ", t2-t1)
+
+    t1 = time.time()
     segment_targets = np.clip(segment_targets, 0, 1) # target range [0,1]
     
-    t2 = time.time()
     #print("classify_with_annotation: ", t2-t1)
     
     # bool_idx for signal and background
@@ -157,17 +168,26 @@ def get_segments_and_labels(wave, sample_rate, annotation_df, n_shot, n_backgrou
     
     background_segments = segments[background_bool_idx,:]
     background_segment_targets = segment_targets[background_bool_idx,:,:]
+
+    signal_intervals     = np.array(segment_intervals)[signal_bool_idx]
+    background_intervals = np.array(segment_intervals)[background_bool_idx]
+    t2 = time.time()
+    print("after nested loop time: ", t2-t1)
+
+    print("#background segments: ", len(background_segments))
     
     if len(background_segments) < len(signal_segments):
-        return signal_segments, signal_segment_targets, background_segments, background_segment_targets
+        return signal_segments, signal_segment_targets, signal_intervals, background_segments, background_segment_targets, background_intervals
     else:
         # TODO: maybe think a bit more about this. Mainly done to save memory space.
         n_sample = min(len(background_segments), n_background) # can only sample as many as there is
         background_random_idx = np.random.choice(np.arange(len(background_segments)), n_sample, replace=False) # sample background signals
         background_segments = background_segments[background_random_idx]
         background_segment_targets = background_segment_targets[background_random_idx]
+
+        background_intervals = background_intervals[background_random_idx]
         
-        return signal_segments, signal_segment_targets, background_segments, background_segment_targets
+        return signal_segments, signal_segment_targets, signal_intervals, background_segments, background_segment_targets, background_intervals
 
     
 def load_wave(wav_path):
