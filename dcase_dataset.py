@@ -3,6 +3,7 @@ import os
 import glob
 import pandas as pd
 import numpy as np
+import time
 
 import torch
 from dcase_utils import get_label_train as get_label_train_fn
@@ -34,21 +35,27 @@ class BioacousticDataset(torch.utils.data.Dataset):
                     assert(root_dir.endswith('.csv'))
                     csv_paths = [root_dir]
                     basename = os.path.basename(root_dir)
-                    cache_dir = os.path.join('cache/valid', basename)
+                    cache_dir = os.path.join('cache/valid', basename.split('.')[0])
                 else:
                     get_label_fn = get_label_train_fn
                     cache_dir = 'cache/train'
                     assert(root_dir.endswith('/'))
                     csv_paths = glob.glob(os.path.join(root_dir, '*/*.csv'))
 
-                x_path = 'x_{}_{}_{}_{}_{}.npy'.format(window_size, hop_size, n_classes, n_time, n_background, sample_rate)
-                y_path = 'y_{}_{}_{}_{}_{}.npy'.format(window_size, hop_size, n_classes, n_time, n_background, sample_rate)
-                if cache and os.path.exists(os.path.join(cache_dir, x_path)):
-                    print("loading cached data ...")
-                    self.x = np.load(os.path.join(cache_dir, x_path))
-                    self.y = np.load(os.path.join(cache_dir, y_path))
+                x_bg_path = 'x_bg_{}_{}_{}_{}_{}_{}_{}.npy'.format(window_size, hop_size, n_classes, n_time, n_background, n_shot, sample_rate)
+                x_sig_path = 'x_sig_{}_{}_{}_{}_{}_{}_{}.npy'.format(window_size, hop_size, n_classes, n_time, n_background, n_shot, sample_rate)
+                y_bg_path = 'y_bg_{}_{}_{}_{}_{}_{}_{}.npy'.format(window_size, hop_size, n_classes, n_time, n_background, n_shot, sample_rate)
+                y_sig_path = 'y_sig_{}_{}_{}_{}_{}_{}_{}.npy'.format(window_size, hop_size, n_classes, n_time, n_background, n_shot, sample_rate)
+                intervals_path = 'intervals_{}_{}_{}_{}_{}_{}_{}.npy'.format(window_size, hop_size, n_classes, n_time, n_background, n_shot, sample_rate)
+                if cache and os.path.exists(os.path.join(cache_dir, x_bg_path)):
+                    #print("loading cached data ...")
+                    self.x_bg = np.load(os.path.join(cache_dir, x_bg_path))
+                    self.y_bg = np.load(os.path.join(cache_dir, y_bg_path))
+                    self.x_sig = np.load(os.path.join(cache_dir, x_sig_path))
+                    self.y_sig = np.load(os.path.join(cache_dir, y_sig_path))
+                    self.intervals = np.load(os.path.join(cache_dir, intervals_path))
                 else:
-                    print("building dataset ...")
+                    #print("building dataset ...")
 
                     wav_paths = [x.replace('csv', 'wav') for x in csv_paths]
                     
@@ -61,66 +68,123 @@ class BioacousticDataset(torch.utils.data.Dataset):
                     
                     sig_segss = []
                     sig_seg_targetss = []
+                    sig_intervalss = []
                     
                     bg_segss = []
                     bg_seg_targetss = []
+                    bg_intervalss = []
                     
                     sample_rates = []
+
+                    # TODO: possibly a loop over the data first to compute the allocation needed
+                    # 1. compute the allocated array needed
+                    # 2. allocate the array
+                    # 3. populate the array
                     
-                    for wav_path, csv_path in tqdm.tqdm(list(zip(wav_paths, csv_paths))):
-                            wave, sample_rate = load_wave(wav_path)
-                            sample_rates.append(sample_rate)
-                            annotation_df = pd.read_csv(csv_path)
+                    for wav_path, csv_path in (list(zip(wav_paths, csv_paths))):
+                        #print("------------------------------------------")
+                        #print("- csv file: ", os.path.basename(csv_path))
+                        #print("------------------------------------------")
+                        
+                        t1 = time.time()
+                        wave, sample_rate = load_wave(wav_path)
+                        sample_rates.append(sample_rate)
+                        annotation_df = pd.read_csv(csv_path)
+                        t2 = time.time()
+                        #print("data loading time: ", t2-t1)
 
-                            sig_segs, sig_seg_targets, bg_segs, bg_seg_targets = get_segments_and_labels(
-                                    wave, sample_rate, annotation_df, n_shot, n_background, hop_size, window_size, n_classes, n_time, get_label_fn
-                            )
+                        t1 = time.time()
+                        sig_segs, sig_seg_targets, sig_intervals, bg_segs, bg_seg_targets, bg_intervals = get_segments_and_labels(
+                                wave, sample_rate, annotation_df, n_shot, n_background, hop_size, window_size, n_classes, n_time, get_label_fn
+                        )
+                        t2 = time.time()
+                        #print("annotation loading time: ", t2-t1)
 
-                            sig_segss.append(sig_segs)
-                            sig_seg_targetss.append(sig_seg_targets)
-                            
-                            if len(bg_segs) > 0:
-                                    bg_segss.append(bg_segs)
-                                    bg_seg_targetss.append(bg_seg_targets)
-                            
+                        sig_segss.append(sig_segs)
+                        sig_seg_targetss.append(sig_seg_targets)
+                        sig_intervalss.append(sig_intervals)
+                        #print("sig_segs: ", len(sig_segs))
+                        
+                        if len(bg_segs) > 0:
+                            #print("bg_segs: ", bg_segs.shape)
+                            bg_segss.append(bg_segs)
+                            bg_seg_targetss.append(bg_seg_targets)
+                            bg_intervalss.append(bg_intervals)
+                    
+                    #print("")
                     assert(len(list(set(sample_rates))) == 1)
                     assert(sample_rates[0] == self.sample_rate)
                     
-
                     if len(bg_segss) > 0:
                         x_bg = np.concatenate(bg_segss)
                         y_bg = np.concatenate(bg_seg_targetss)
+                        bg_intervals = np.concatenate(bg_intervalss)
                     else:
                         n_background = 0
                         print("There were no background in: ", root_dir)
                     
                     x_sig = np.concatenate(sig_segss)
+                    #print("x_sig: ", x_sig.shape)
                     y_sig = np.concatenate(sig_seg_targetss)
+                    sig_intervals = np.concatenate(sig_intervalss)
                     
                     if n_background > 0:
-                            self.x = np.concatenate((x_sig, x_bg[:n_background]))
-                            self.y = np.concatenate((y_sig, y_bg[:n_background]))
+                        #print("x_bg: ", x_bg.shape)
+
+                        self.x_bg = x_bg
+                        self.y_bg = y_bg
+
+                        self.x_sig = x_sig
+                        self.y_sig = y_sig
+                        #self.x = np.concatenate((x_sig, x_bg))
+                        #self.y = np.concatenate((y_sig, y_bg))
+                        #self.sig_intervals = sig_intervals
+                        #self.bg_intervals  = bg_intervals
+                        self.intervals = np.concatenate((sig_intervals, bg_intervals))
                     else:
-                            self.x = x_sig
-                            self.y = y_sig
-                    
+                        self.x_sig = x_sig
+                        self.y_sig = y_sig
+                        self.intervals = sig_intervals
+                        self.x_bg = np.array([])
+                        self.y_bg = np.array([])
+                        #self.sig_intervals = sig_intervals
+                
                     if cache:
                         if not os.path.exists(cache_dir):
                             os.makedirs(cache_dir)
-                        np.save(os.path.join(cache_dir, x_path), self.x)
-                        np.save(os.path.join(cache_dir, y_path), self.y)
+                        np.save(os.path.join(cache_dir, x_bg_path), self.x_bg)
+                        np.save(os.path.join(cache_dir, y_bg_path), self.y_bg)
+                        np.save(os.path.join(cache_dir, x_sig_path), self.x_sig)
+                        np.save(os.path.join(cache_dir, y_sig_path), self.y_sig)
+                        np.save(os.path.join(cache_dir, intervals_path), self.intervals)
 
         def __len__(self):
-                return len(self.x)
+                return len(self.x_sig) + len(self.x_bg)
 
         def __getitem__(self, idx):
                 if torch.is_tensor(idx):
                         idx = idx.tolist()
 
-                x = self.x[idx]
-                y = self.y[idx]
+                # Keep track of both background and signal
+                if idx < len(self.x_sig):
+                    x = self.x_sig[idx]
+                    y = self.y_sig[idx]
+                else:
+                    x = self.x_bg[idx-len(self.x_sig)]
+                    y = self.y_bg[idx-len(self.x_sig)]
+
+                #x = self.x[idx]
+                #y = self.y[idx]
 
                 if self.transform:
                         x = self.transform(x)
 
                 return x, y
+
+        #def get_interval_by_idx(idx):
+        #    if idx < len(self.sig_intervals):
+        #        interval = self.sig_intervals[idx]
+        #    else:
+        #        interval = self.bg_intervals[idx-len(self.sig_intervals)]
+
+
