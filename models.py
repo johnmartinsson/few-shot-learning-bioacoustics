@@ -3,8 +3,9 @@ import torch.nn.functional as F
 import torch
 from collections import OrderedDict
 
-def get_model(n_classes, n_time):
-    return ProtoNet(n_classes, n_time)
+def get_model(n_classes, n_time, n_mels, n_bins):
+    return ResNet(n_classes, n_time)
+    #return ProtoNet(n_classes, n_time, n_mels, n_bins)
 
 def conv_block(in_channels,out_channels):
 
@@ -16,15 +17,21 @@ def conv_block(in_channels,out_channels):
     )
 
 class ProtoNet(nn.Module):
-    def __init__(self, n_classes, n_time):
+    def __init__(self, n_classes, n_time, n_mels, n_bins):
         super(ProtoNet,self).__init__()
+
+        scale_x = n_bins / 16
+        scale_y = n_mels / 40
+        
+        scale = int(scale_x * scale_y)
+
         self.encoder = nn.Sequential(
             conv_block(1,64),
             conv_block(64,64),
             conv_block(64,64),
             conv_block(64,64)
         )
-        self.fc1 = nn.Linear(256, 128)
+        self.fc1 = nn.Linear(128 * scale, 128)
         self.dropout = nn.Dropout(0.3)
         self.fc2 = nn.Linear(128, n_classes*n_time)
 
@@ -101,7 +108,7 @@ class BasicBlock(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block=BasicBlock, keep_prob=1.0, avg_pool=True, drop_rate=0.1, dropblock_size=5):
+    def __init__(self, n_classes, n_time, block=BasicBlock, keep_prob=1.0, avg_pool=True, drop_rate=0.1, dropblock_size=5):
         self.inplanes = 1
         super(ResNet, self).__init__()
 
@@ -116,6 +123,13 @@ class ResNet(nn.Module):
         self.dropout = nn.Dropout(p=1 - self.keep_prob, inplace=False)
         self.drop_rate = drop_rate
         self.pool = nn.AdaptiveAvgPool2d((4, 2))
+
+        self.fc1 = nn.Linear(4*2*64, 128)
+        self.dropout = nn.Dropout(0.3)
+        self.fc2 = nn.Linear(128, n_classes*n_time)
+
+        self.n_classes = n_classes
+        self.n_time = n_time
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -140,17 +154,31 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        (num_samples,seq_len,mel_bins) = x.shape
-        x = x.view(-1,1,seq_len,mel_bins)
+        print(x.shape)
+        #(num_samples,seq_len,mel_bins) = x.shape
+        #x = x.view(-1,1,seq_len,mel_bins)
 
+        print("x shape 0: ", x.shape)
         x = self.layer1(x)
+        print("x shape 1: ", x.shape)
         x = self.layer2(x)
+        print("x shape 2: ", x.shape)
         x = self.layer3(x)
-        
-        #x = self.layer4(x)
+        print("x shape 3: ", x.shape)
+        x = self.layer4(x)
+        print("x shape 4: ", x.shape)
         
         x = self.pool(x)
-        
+        print("x (pool) shape: ", x.shape)
+
+        # flatten
         x = x.view(x.size(0), -1)
-        
-        return x
+
+        x = self.fc1(x)
+        x_rep = F.relu(x)
+        x = self.dropout(x_rep)
+        x = self.fc2(x)
+
+        y_pred = x.view((-1, self.n_classes, self.n_time))
+
+        return y_pred, x_rep
