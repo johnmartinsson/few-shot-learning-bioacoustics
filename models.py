@@ -1,11 +1,17 @@
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from collections import OrderedDict
 
-def get_model(n_classes, n_time, n_mels, n_bins):
-    return ResNet(n_classes, n_time)
-    #return ProtoNet(n_classes, n_time, n_mels, n_bins)
+def get_model(name, n_classes, n_time, n_mels, n_bins):
+    if name == "protonet":
+        return ProtoNet(n_classes, n_time, n_mels, n_bins)
+
+    elif name == "resnet":
+        return ResNet(n_classes, n_time)
+    else:
+        raise ValueError("model with name {} not defined ... ")
 
 def conv_block(in_channels,out_channels):
 
@@ -111,22 +117,29 @@ class ResNet(nn.Module):
     def __init__(self, n_classes, n_time, block=BasicBlock, keep_prob=1.0, avg_pool=True, drop_rate=0.1, dropblock_size=5):
         self.inplanes = 1
         super(ResNet, self).__init__()
+        # settings
+        pooling_size = (4,2)
+        n_layer1 = 32 #32
+        n_layer2 = 32 #64
+        n_layer3 = 32 #128
+        n_layer4 = 32 #256
+        embedding_dim = 128
 
-        self.layer1 = self._make_layer(block, 64, stride=2, drop_rate=drop_rate)
-        self.layer2 = self._make_layer(block, 128, stride=2, drop_rate=drop_rate)
-        self.layer3 = self._make_layer(block, 64, stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size)
-        self.layer4 = self._make_layer(block, 64, stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size)
+        self.layer1 = self._make_layer(block, n_layer1, stride=2, drop_rate=drop_rate)
+        self.layer2 = self._make_layer(block, n_layer2, stride=2, drop_rate=drop_rate)
+        self.layer3 = self._make_layer(block, n_layer3, stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size)
+        self.layer4 = self._make_layer(block, n_layer4, stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size)
         if avg_pool:
             self.avgpool = nn.AvgPool2d(5, stride=1)
         self.keep_prob = keep_prob
         self.keep_avg_pool = avg_pool
         self.dropout = nn.Dropout(p=1 - self.keep_prob, inplace=False)
         self.drop_rate = drop_rate
-        self.pool = nn.AdaptiveAvgPool2d((4, 2))
+        self.pool = nn.AdaptiveAvgPool2d(pooling_size)
 
-        self.fc1 = nn.Linear(4*2*64, 128)
+        self.fc1 = nn.Linear(np.prod(pooling_size)*n_layer4, embedding_dim)
         self.dropout = nn.Dropout(0.3)
-        self.fc2 = nn.Linear(128, n_classes*n_time)
+        self.fc2 = nn.Linear(embedding_dim, n_classes*n_time)
 
         self.n_classes = n_classes
         self.n_time = n_time
@@ -154,22 +167,22 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        print(x.shape)
+        #print(x.shape)
         #(num_samples,seq_len,mel_bins) = x.shape
         #x = x.view(-1,1,seq_len,mel_bins)
 
-        print("x shape 0: ", x.shape)
+        #print("x shape 0: ", x.shape)
         x = self.layer1(x)
-        print("x shape 1: ", x.shape)
+        #print("x shape 1: ", x.shape)
         x = self.layer2(x)
-        print("x shape 2: ", x.shape)
+        #print("x shape 2: ", x.shape)
         x = self.layer3(x)
-        print("x shape 3: ", x.shape)
+        #print("x shape 3: ", x.shape)
         x = self.layer4(x)
-        print("x shape 4: ", x.shape)
+        #print("x shape 4: ", x.shape)
         
         x = self.pool(x)
-        print("x (pool) shape: ", x.shape)
+        #print("x (pool) shape: ", x.shape)
 
         # flatten
         x = x.view(x.size(0), -1)

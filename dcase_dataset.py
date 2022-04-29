@@ -8,12 +8,12 @@ import time
 import torch
 from dcase_utils import get_label_train as get_label_train_fn
 from dcase_utils import get_label_valid as get_label_valid_fn
-from sed_utils import load_wave, get_segments_and_labels
+from sed_utils import load_wave, get_segments_and_labels, get_segments_and_labels_new
 
 class BioacousticDataset(torch.utils.data.Dataset):
         """Bioacoustic dataset."""
 
-        def __init__(self, root_dir, window_size, hop_size, sample_rate, n_classes, n_time, n_shot=1000000, n_background=1000000, transform=None, cache=True, is_validation_data=False):
+        def __init__(self, root_dir, window_size, hop_size, sample_rate, n_classes, n_time, n_shot=1000000, n_background=1000000, transform=None, cache=True, is_validation_data=False, use_old=True):
                 """
                 Args:
                         root_dir        : Training_Set with all wav files and annotations.
@@ -81,7 +81,7 @@ class BioacousticDataset(torch.utils.data.Dataset):
                     # 2. allocate the array
                     # 3. populate the array
                     
-                    for wav_path, csv_path in (list(zip(wav_paths, csv_paths))):
+                    for wav_path, csv_path in tqdm.tqdm(list(zip(wav_paths, csv_paths)), disable=is_validation_data):
                         #print("------------------------------------------")
                         #print("- csv file: ", os.path.basename(csv_path))
                         #print("------------------------------------------")
@@ -94,9 +94,15 @@ class BioacousticDataset(torch.utils.data.Dataset):
                         #print("data loading time: ", t2-t1)
 
                         t1 = time.time()
-                        sig_segs, sig_seg_targets, sig_intervals, bg_segs, bg_seg_targets, bg_intervals = get_segments_and_labels(
-                                wave, sample_rate, annotation_df, n_shot, n_background, hop_size, window_size, n_classes, n_time, get_label_fn
-                        )
+                        if use_old:
+                            sig_segs, sig_seg_targets, sig_intervals, bg_segs, bg_seg_targets, bg_intervals = get_segments_and_labels(
+                                    wave, sample_rate, annotation_df, n_shot, n_background, hop_size, window_size, n_classes, n_time, get_label_fn
+                            )
+                        else:
+                            sig_segs, sig_seg_targets, sig_intervals, bg_segs, bg_seg_targets, bg_intervals = get_segments_and_labels_new(
+                                    wave, sample_rate, annotation_df, n_shot, n_background, hop_size, window_size, n_classes, n_time, get_label_fn
+                            )
+
                         t2 = time.time()
                         #print("annotation loading time: ", t2-t1)
 
