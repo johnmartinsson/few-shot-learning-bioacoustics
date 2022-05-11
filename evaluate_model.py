@@ -12,9 +12,128 @@ import post_processing as pp
 import sed_utils
 import dcase_evaluation
 
+def create_prototype_embeddings(model, wave, sample_rate, annotations, window_size, tf_transform):
+    hop_size = window_size // 16
+
+    embeddings = []
+
+    for (start_time, end_time) in annotations:
+        start_idx = int(np.ceil(sample_rate * start_time))
+        end_idx   = int(np.floor(sample_rate * end_time))
+        ann_window_size = end_idx - start_idx
+
+        # TODO: consider how to expand this in the best way
+        if window_size - ann_window_size > 0:
+            to_pad = window_size - ann_window_size
+        else:
+            to_pad = 0
+
+        annotation_segment = wave[start_idx:end_idx]
+        annotation_segment = np.pad(annotation_segment, int(np.ceil(to_pad / 2)))
+
+        annotation_segments, _ = sed_utils.split_into_segments(annotation_segment, sample_rate, hop_size, window_size)
+
+        for wave_segment in tqdm.tqdm(annotation_segments):
+            x_array = tf_transform(wave_segment)
+            x_tensor = torch.from_numpy(x_array)
+            x_tensor = x_tensor.view((1, 1, x_tensor.shape[0], x_tensor.shape[1])).double()
+            x_tensor = x_tensor.cuda()
+            _, embedding = model(x_tensor)
+            embeddings.append(embedding.detach().cpu().numpy())
+    embeddings = np.concatenate(embeddings)
+        
+    return embeddings 
+
+def create_prototype(model, wave, sample_rate, annotations, window_size, tf_transform):
+    embeddings = create_prototype_embeddings(model, wave, sample_rate, annotations, window_size, tf_transform)
+    return np.mean(embeddings, axis=0)
+
+def create_positive_prototype(model, n_shot, csv_path, window_size, tf_transform):
+    p_embeddings = create_positive_embeddings(model, n_shot, csv_path, window_size, tf_transform)
+    return np.mean(embeddings, axis=0)
+
+def create_positive_embeddings(model, n_shot, csv_path, window_size, tf_transform):
+    print("creating positive embeddings ...")
+    wav_path    = csv_path.replace('.csv', '.wav')
+    wave, sample_rate = sed_utils.load_wave(wav_path)
+
+    ann_df      = pd.read_csv(csv_path)
+    ann_df.sort_values(by='Starttime', axis=0, ascending=True)
+
+    ref_pos_indexes = ann_df.index[ann_df["Q"] == 'POS'].tolist()
+    ann_5shot_df = ann_df.loc[ref_pos_indexes[:n_shot]]
+
+    starttimes = ann_5shot_df['Starttime'].tolist()
+    endtimes = ann_5shot_df['Endtime'].tolist()
+
+    annotations = list(zip(starttimes, endtimes))
+
+    embeddings = create_prototype_embeddings(model, wave, sample_rate, annotations, window_size, tf_transform)
+
+    return embeddings
+
+def create_negative_prototype(model, n_shot, csv_path, window_size, tf_transform):
+    n_embeddings = create_negative_embeddings(model, n_shot, csv_path, window_size, tf_transform)
+    return np.mean(n_embeddings, axis=0)
+
+def create_negative_embeddings(model, n_shot, csv_path, window_size, tf_transform):
+    print("creating negative embeddings ...")
+    wav_path    = csv_path.replace('.csv', '.wav')
+    wave, sample_rate = sed_utils.load_wave(wav_path)
+
+    ann_df      = pd.read_csv(csv_path)
+    ann_df.sort_values(by='Starttime', axis=0, ascending=True)
+
+    ref_pos_indexes = ann_df.index[ann_df["Q"] == 'POS'].tolist()
+    ann_5shot_df = ann_df.loc[ref_pos_indexes[:n_shot]]
+
+    endtimes   = ann_5shot_df['Starttime'][1:].tolist()
+    starttimes = ann_5shot_df['Endtime'][:4].tolist()
+ 
+    annotations = list(zip(starttimes, endtimes))
+
+    embeddings = create_prototype_embeddings(model, wave, sample_rate, annotations, window_size, tf_transform)
+
+    return embeddings
+
+def create_query_embeddings(model, wav_path, sample_rate, window_size, hop_size, tf_transform, batch_size=64):
+    print("creating query embeddings ...")
+    wave, sample_rate = sed_utils.load_wave(wav_path)
+
+    N = len(wave)
+    M = int(np.floor((N-window_size)/hop_size))
+    segment_indices = [(hop_size*i, hop_size*i + window_size) for i in range(M+1)]
+    embedding_times = [(start_idx / sample_rate, end_idx / sample_rate) for (start_idx, end_idx) in segment_indices]
+
+    # load all the tensors
+    #start_idx, end_idx = segment_indices[0]
+    #wave_segment = wave[start_idx:end_idx]
+    #x_array = tf_transform(wave_segment)
+    #(n_mels, n_bins) = x_array.shape
+
+    #x_arrays = np.zeros((len(wave_segments), n_mels, n_bins))
+    #print("x_arrays: ", x_arrays.shape)
+
+    embeddings   = []
+    for idx, (start_idx, end_idx) in enumerate(tqdm.tqdm(segment_indices)):
+        wave_segment = wave[start_idx:end_idx]
+        x_array = tf_transform(wave_segment)
+        #x_arrays[idx,:,:] = x_array
+
+        #for x in tqdm.tqdm(x_arrays):
+        x = torch.from_numpy(x_array)
+        x = x.view((1, 1, x.shape[0], x.shape[1])).double()
+        x = x.cuda()
+        logits, embedding = model(x)
+        embeddings.append(embedding.detach().cpu().numpy())
+    embeddings = np.concatenate(embeddings, axis=0)
+
+    return embeddings, embedding_times #wave_segment_times
+
 def evaluate(experiment_dir, conf):
     root_path = conf['root_path']
-    csv_paths = glob.glob(os.path.join(root_path, '*/*.csv'))
+    csv_paths = conf['csv_paths']
+    #csv_paths = glob.glob(os.path.join(root_path, '*/*.csv'))
 
     # make predictions
     pred_df = predict(experiment_dir, csv_paths, conf)
@@ -35,7 +154,7 @@ def evaluate(experiment_dir, conf):
             dataset        = 'VAL',
             savepath       = experiment_dir,
             metadata       = [],
-            verbose        = True
+            verbose        = False
     )
     #fmeasure  = overall_scores['f-measure']
     #precision = overall_scores['precision']
@@ -49,7 +168,7 @@ def evaluate(experiment_dir, conf):
             dataset        = 'VAL',
             savepath       = experiment_dir,
             metadata       = [],
-            verbose        = True
+            verbose        = False
     )
     #post_fmeasure  = overall_scores['f-measure']
     #post_precision = overall_scores['precision']
@@ -95,8 +214,11 @@ def predict(experiment_dir, csv_paths, conf):
         # Compute the prototypes
         ###############################################################################################################
         
-        valid_dataset_5_shot = dcase_dataset.BioacousticDataset(
-            root_dir           = csv_path,
+        print("n-shot: ", n_shot)
+        print("window_size: ", window_size)
+        print("hop_size: ", hop_size)
+        valid_dataset_5_shot = dcase_dataset.BioacousticDatasetNew(
+            csv_paths          = [csv_path],
             window_size        = window_size,
             hop_size           = hop_size,
             sample_rate        = sample_rate,
@@ -109,6 +231,8 @@ def predict(experiment_dir, csv_paths, conf):
             is_validation_data = True,
             use_old            = False,
         )
+
+        print("5-shot: ", len(valid_dataset_5_shot.x_sig))
 
         # load best model
         model = models.get_model(model_name, n_classes, n_time, n_mels, n_bins)
@@ -124,8 +248,8 @@ def predict(experiment_dir, csv_paths, conf):
         ###############################################################################################################
         # Classify the whole validation file
         ###############################################################################################################
-        valid_dataset_all = dcase_dataset.BioacousticDataset(
-            root_dir           = csv_path,
+        valid_dataset_all = dcase_dataset.BioacousticDatasetNew(
+            csv_paths          = [csv_path],
             window_size        = window_size,
             hop_size           = hop_size,
             sample_rate        = sample_rate,
@@ -161,8 +285,6 @@ def predict(experiment_dir, csv_paths, conf):
 
         sorted_predicitions, sorted_intervals = zip(*sorted(list(zip(y_preds, valid_dataset_all.intervals)), key=lambda x: x[1][0]))
 
-        classes = ['POS', 'NEG']
-
         # Get the 5th annotated positive event, and set the end of that
         # event as the skiptime. (Remove all predictions before.)
         ann_df = pd.read_csv(csv_path)
@@ -171,7 +293,7 @@ def predict(experiment_dir, csv_paths, conf):
         skiptime = nth_event['Endtime']
 
         for y_pred, interval in zip(sorted_predicitions, sorted_intervals):
-            class_name = classify_category(y_pred[0])
+            class_name = classify_category(y_pred[0], thr=conf['classification_threshold'])
             if class_name == 'POS':
                 if not interval[0] < skiptime:
                     pos_events.append({
@@ -226,10 +348,10 @@ def create_prototypes(valid_loader, model, use_embeddings=True):
     
     return n_prototype, p_prototype
 
-def create_positive_prototype(dataset):
-    targets = dataset.y
-    sg_bool_idx = np.sum(targets[:,0:n_classes,:], axis=(1, 2)) > 0
-    return p_prototype
+#def create_positive_prototype(dataset):
+#    targets = dataset.y
+#    sg_bool_idx = np.sum(targets[:,0:n_classes,:], axis=(1, 2)) > 0
+#    return p_prototype
 
 def euclidean_distance(x1, x2):
     return np.sqrt(np.sum(np.power(x1-x2, 2)))

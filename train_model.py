@@ -57,7 +57,8 @@ def evaluate(model, loader, loss_function):
     return running_loss / count
 
 def main(experiment_dir, train_conf, downstream_eval_conf):
-    root_path = train_conf['root_path']
+    #root_path = train_conf['root_path']
+    csv_paths = train_conf['csv_paths']
     # Model settings
     model_name = train_conf['model_name']
 
@@ -93,8 +94,8 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
     tf_transform = tf_transforms[tf_transform_name]
 
     # load the dataset
-    base_dataset = dcase_dataset.BioacousticDataset(
-	root_dir           = root_path,
+    base_dataset = dcase_dataset.BioacousticDatasetNew(
+	csv_paths          = csv_paths,
 	window_size        = window_size,
 	hop_size           = hop_size,
 	sample_rate        = sample_rate,
@@ -154,7 +155,7 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
             # evaluate on downstream task
             if epoch % epoch_downstream_eval == 0:
                 overall_scores, scores_per_subset, post_overall_scores, post_scores_per_subset = evaluate_model.evaluate(experiment_path, downstream_eval_conf)
-                print(overall_scores)
+                #print(overall_scores)
                 print(scores_per_subset)
 
                 writer.add_scalar('downstream/overall/fmeasure', overall_scores['f-measure'], epoch)

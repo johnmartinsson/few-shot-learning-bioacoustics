@@ -4,6 +4,20 @@ import numpy as np
 
 import time
 
+def my_frames_to_time(frames, sample_rate):
+    if sample_rate == 11025:
+        window_size = 256 # ~25 ms
+        hop_size    = 128 # 
+        n_fft       = 256 # 
+    elif sample_rate == 22050:
+        window_size = 2*256 # ~25 ms
+        hop_size    = 2*128 # 
+        n_fft       = 2*256 # 
+    else:
+        raise ValueError("undefined for sample rate: {}".format(sample_rate))
+
+    return librosa.frames_to_time(frames, sr=sample_rate, hop_length=hop_size, n_fft=n_fft)
+
 def get_bioacoustic_pcen_conf():
     return {
 	'gain' : 0.8,
@@ -148,9 +162,16 @@ def get_segments_and_labels_new(wave, sample_rate, annotation_df, n_shot, n_back
     labels = labels[:n_shot]
 
     segment_size = segments.shape[1]
-    scale = segment_size // n_time
+    # special case for n_time == 1
+    if n_time == 1:
+        scale = segment_size // (n_time*2)
+    else:
+        scale = segment_size // n_time
+
     target = np.zeros((len(wave)//scale, n_classes), dtype=int)
 
+    # the reason we scale down like this is memory efficiency, the targets
+    # take way too much memory otherwise
     for annotation_interval, label in zip(annotation_intervals, labels):
         start_time = annotation_interval[0] / scale
         end_time   = annotation_interval[1] / scale
@@ -162,6 +183,11 @@ def get_segments_and_labels_new(wave, sample_rate, annotation_df, n_shot, n_back
     target = np.clip(target, 0, 1)
     segment_targets, segment_target_intervals = split_into_segments(target, sample_rate//scale, hop_size//scale, window_size//scale)
     segment_targets = np.transpose(segment_targets, axes=(0,2,1))
+
+    # special case for n_time == 1
+    if n_time == 1:
+        segment_targets = np.max(segment_targets, axis=2)
+        segment_targets = np.expand_dims(segment_targets, axis=2)
     
     # bool_idx for signal and background
     signal_bool_idx     = np.sum(segment_targets[:,0:n_classes,:], axis=(1, 2)) > 0 # sum over class and time dimension

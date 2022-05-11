@@ -74,19 +74,20 @@ def adaptive_remove_unmatchable_predictions(prediction_df, csv_paths, n_shot):
     dfs = []
     for csv_path in csv_paths:
         key = os.path.basename(csv_path).replace('.csv', '.wav')
-        prediction = prediction_groups.get_group(key)
-        
-        event_lengths = stats_utils.get_nshot_event_lengths(n_shot, csv_path)
-        mean_event_length = event_lengths.mean()
-        
-        predicted_event_lengths = prediction['Endtime'] - prediction['Starttime']
-        
-        # These can not be matched
-        not_too_short = predicted_event_lengths > 0.3 * mean_event_length
-        not_too_long  = predicted_event_lengths < (1/0.3)*mean_event_length
-        df = prediction[not_too_short & not_too_long]
+        if key in prediction_groups.groups.keys():
+            prediction = prediction_groups.get_group(key)
+            
+            event_lengths = stats_utils.get_nshot_event_lengths(n_shot, csv_path)
+            mean_event_length = event_lengths.mean()
+            
+            predicted_event_lengths = prediction['Endtime'] - prediction['Starttime']
+            
+            # These can not be matched
+            not_too_short = predicted_event_lengths > 0.3 * mean_event_length
+            not_too_long  = predicted_event_lengths < (1/0.3)*mean_event_length
+            df = prediction[not_too_short & not_too_long]
 
-        #print(df_test)
-        #print(df)
-        dfs.append(df)
+            #print(df_test)
+            #print(df)
+            dfs.append(df)
     return pd.concat(dfs, ignore_index=True)
