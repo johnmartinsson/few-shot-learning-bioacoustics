@@ -11,14 +11,42 @@ from dcase_utils import get_label_valid as get_label_valid_fn
 from sed_utils import load_wave, get_segments_and_labels, get_segments_and_labels_new
 import sed_utils
 
-class BasicDataset(torch.utils.data.Dataset):
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+class PrototypeDataset(torch.utils.data.Dataset):
+    def __init__(self, wave, annotations, window_size, hop_size, sample_rate, transform=None):
+
+        xs = []
+        times = []
+        for (start_time, end_time) in annotations:
+            start_idx = int(np.ceil(start_time * sample_rate))
+            end_idx   = int(np.floor(end_time * sample_rate))
+
+            ann_window_size = end_idx - start_idx
+
+            # TODO: consider how to expand this in the best way
+            if window_size - ann_window_size > 0:
+                to_pad = window_size - ann_window_size
+            else:
+                to_pad = 0
+
+            wave_segment = wave[start_idx:end_idx]
+            wave_segment = np.pad(wave_segment, int(np.ceil(to_pad / 2)))
+            wave_segments, segment_times = sed_utils.split_into_segments(wave_segment, sample_rate, hop_size, window_size)
+            segment_times = [(x[0] + start_time, x[1] + start_time) for x in segment_times]
+            xs.append(wave_segments)
+            times.append(segment_times)
+
+        self.x = np.concatenate(xs)
+        self.times = np.concatenate(times)
+        self.transform = transform
+
     def __len__(self):
         return len(self.x)
+
     def __getitem__(self, idx):
-        return self.x[idx], self.y[idx]
+        x = self.x[idx]
+        if self.transform:
+            x = self.transform(x)
+        return x
 
 class BioacousticDatasetNew(torch.utils.data.Dataset):
     """Bioacoustic dataset."""

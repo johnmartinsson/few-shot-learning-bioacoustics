@@ -42,7 +42,7 @@ def evaluate(model, loader, loss_function):
 
     ys = []
     ys_pred = []
-    for (x, y) in loader:
+    for (x, y) in tqdm.tqdm(loader):
         x = x.view((x.shape[0], 1, x.shape[1], x.shape[2])).double() # add channel dimension
         x = x.cuda()
         y = y.double()
@@ -112,12 +112,16 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
     train_size = int(0.8 * len(base_dataset))
     valid_size = len(base_dataset) - train_size
     base_train, base_valid = torch.utils.data.random_split(base_dataset, [train_size, valid_size])
+    print("training x shape: ", base_train[0][0].shape)
+    print("training y shape: ", base_train[0][1].shape)
 
+    print("start training ...")
     for idx_run in range(nb_runs):
         experiment_path = os.path.join(experiment_dir, 'run_{}'.format(idx_run))
 
         writer = torch.utils.tensorboard.SummaryWriter(log_dir=experiment_path)
 
+        print("moving model to gpu ...")
         model = models.get_model(model_name, n_classes, n_time, n_mels, n_bins).double()
         model = model.cuda()
         # just a copy of the model
@@ -138,10 +142,12 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
 
         while not_converged:
             # evaluate
+            print("evaluate model ...")
             valid_loss = evaluate(model, base_valid_loader, loss_function)
 
             # save best model
             if valid_loss < best_valid_loss or epoch == 0:
+                print("saving best model ...")
                 best_valid_loss = valid_loss
                 best_epoch = epoch
                 best_model.load_state_dict(model.state_dict())
@@ -150,10 +156,10 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
                 # save settings files
                 np.save(os.path.join(experiment_path, "train_conf.npy"), train_conf)
                 np.save(os.path.join(experiment_path, "valid_conf.npy"), downstream_eval_conf)
-                print("saving best model ...")
 
             # evaluate on downstream task
             if epoch % epoch_downstream_eval == 0:
+                print("evaluating best model ...")
                 overall_scores, scores_per_subset, post_overall_scores, post_scores_per_subset = evaluate_model.evaluate(experiment_path, downstream_eval_conf)
                 #print(overall_scores)
                 print(scores_per_subset)

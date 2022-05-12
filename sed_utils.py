@@ -4,6 +4,17 @@ import numpy as np
 
 import time
 
+def get_tf_tramsform(name, n_mels, sample_rate):
+    bioacoustic_conf = get_bioacoustic_pcen_conf()
+    speech_conf      = get_speech_pcen_conf()
+    tf_transforms = {
+        'decibel'           : lambda x: wav_to_mel(x - (np.sum(x)/np.size(x)), sample_rate, n_mels=n_mels),
+        'pcen_biodiversity' : lambda x: wav_to_pcen(x - (np.sum(x)/np.size(x)), sample_rate, bioacoustic_conf, n_mels=n_mels),
+        'pcen_speech'       : lambda x: wav_to_pcen(x - (np.sum(x)/np.size(x)), sample_rate, speech_conf, n_mels=n_mels),
+    }
+    tf_transform = tf_transforms[name]
+    return tf_transform
+
 def my_frames_to_time(frames, sample_rate):
     if sample_rate == 11025:
         window_size = 256 # ~25 ms

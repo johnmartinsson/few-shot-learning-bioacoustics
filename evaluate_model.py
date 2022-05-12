@@ -12,6 +12,16 @@ import post_processing as pp
 import sed_utils
 import dcase_evaluation
 
+def create_embeddings(model, data_loader):
+    embeddings   = []
+    for x in data_loader:
+        x = x.view((x.shape[0], 1, x.shape[1], x.shape[2])).double()
+        x = x.cuda()
+        _, embedding = model(x)     
+        embeddings.append(embedding.detach().cpu().numpy())
+    embeddings = np.concatenate(embeddings)
+    return embeddings
+
 def create_prototype_embeddings(model, wave, sample_rate, annotations, window_size, tf_transform):
     hop_size = window_size // 16
 
@@ -50,7 +60,7 @@ def create_prototype(model, wave, sample_rate, annotations, window_size, tf_tran
 
 def create_positive_prototype(model, n_shot, csv_path, window_size, tf_transform):
     p_embeddings = create_positive_embeddings(model, n_shot, csv_path, window_size, tf_transform)
-    return np.mean(embeddings, axis=0)
+    return np.mean(p_embeddings, axis=0)
 
 def create_positive_embeddings(model, n_shot, csv_path, window_size, tf_transform):
     print("creating positive embeddings ...")

@@ -12,6 +12,8 @@ def get_model(name, n_classes, n_time, n_mels, n_bins):
         return ResNet(n_classes, n_time)
     elif name == "resnet_small":
         return ResNet(n_classes, n_time, small=True)
+    elif name == "resnet_big":
+        return ResNet(n_classes, n_time, small=True, n_layer1=64, n_layer2=128, n_layer3=256)
     else:
         raise ValueError("model with name {} not defined ... ")
 
@@ -116,15 +118,15 @@ class BasicBlock(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, n_classes, n_time, small=False, block=BasicBlock, keep_prob=1.0, avg_pool=True, drop_rate=0.1, dropblock_size=5):
+    def __init__(self, n_classes, n_time, small=False, block=BasicBlock, keep_prob=1.0, avg_pool=True, drop_rate=0.1, dropblock_size=5, n_layer1 = 32, n_layer2 = 32, n_layer3 = 32, n_layer4 = 32):
         self.inplanes = 1
         super(ResNet, self).__init__()
         # settings
         pooling_size = (4,2)
-        n_layer1 = 32 #32
-        n_layer2 = 32 #64
-        n_layer3 = 32 #128
-        n_layer4 = 32 #256
+        #n_layer1 = 32 #32
+        #n_layer2 = 32 #64
+        #n_layer3 = 32 #128
+        #n_layer4 = 32 #256
         embedding_dim = 128
 
         self.small = small
