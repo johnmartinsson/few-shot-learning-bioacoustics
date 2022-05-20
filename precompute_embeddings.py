@@ -27,7 +27,7 @@ import stats_utils
 n_shot = 5
 csv_paths = glob.glob('/mnt/storage_1/datasets/bioacoustics_dcase2022/Development_Set_22050Hz/Validation_Set/*/*.csv')
 
-window_sizes = np.array([2048, 4096, 8192])
+window_sizes = np.array([1024, 1024*4, 1024*8])
 
 for csv_path in csv_paths:
     print(csv_path)
@@ -44,10 +44,11 @@ for csv_path in csv_paths:
 #     # 1.2. choose input segment size based on average event time
 #     input_segment_size = window_size
     
-    for window_size in window_sizes:
-        experiment_dir = './experiments/medium/sample_rate_{}/pcen_biodiversity/window_size_{}/n_background_0/n_time_16/n_mels_128/'.format(sample_rate, window_size)
+    wave, sample_rate = sed_utils.load_wave(csv_path.replace('.csv', '.wav'))
 
-        for idx_run in range(3):
+    for window_size in window_sizes:
+        experiment_dir = 'experiments/resnet_downpool/window_size_{}/n_background_0/n_time_16/n_mels_80/'.format(window_size)
+        for idx_run in range(5, 10):
             experiment_path = os.path.join(experiment_dir, 'run_{}'.format(idx_run))
             train_conf = np.load(os.path.join(experiment_path, 'train_conf.npy'), allow_pickle=True).item()
             valid_conf = np.load(os.path.join(experiment_path, 'valid_conf.npy'), allow_pickle=True).item()
@@ -81,45 +82,26 @@ for csv_path in csv_paths:
             model.eval()
 
             # 2.   compute positive embeddings
-            p_embeddings = evaluate_model.create_positive_embeddings(model, n_shot, csv_path, window_size, tf_transform)
             # 3.   compute negative embeddings
-            n_embeddings = evaluate_model.create_negative_embeddings(model, n_shot, csv_path, window_size, tf_transform)
             # 4.   compute query embeddings and times
-            valid_dataset_all = dcase_dataset.BioacousticDatasetNew(
-                csv_paths          = [csv_path],
-                window_size        = window_size,
-                hop_size           = hop_size,
-                sample_rate        = sample_rate,
-                n_classes          = n_classes,
-                n_time             = n_time,
-                n_shot             = 10000000000000000000000,
-                n_background       = 10000000000000000000000,
-                transform          = tf_transform,
-                cache              = False,
-                is_validation_data = True,
-                use_old            = False
-            )
 
-            use_embeddings = True
-            valid_loader_all = torch.utils.data.DataLoader(valid_dataset_all, batch_size=16, shuffle=False, num_workers=8)
+            pos_anns = stats_utils.get_positive_annotations(csv_path, n_shot, class_name='Q')
+            gap_anns = stats_utils.get_gap_annotations(csv_path, n_shot, class_name='Q')
+            query_anns = stats_utils.get_query_annotations(csv_path, n_shot, class_name='Q')
 
-            q_embeddings   = []
-            for (x, _) in valid_loader_all:
-                x = x.view((x.shape[0], 1, x.shape[1], x.shape[2])).double()
-                x = x.cuda()
-                logits, embedding = model(x)
-                if not use_embeddings:
-                    q_embeddings.append(torch.sigmoid(logits).detach().cpu().numpy())
-                else:
-                    q_embeddings.append(embedding.detach().cpu().numpy())
-            q_embeddings = np.concatenate(q_embeddings)
+            query_dataset = dcase_dataset.PrototypeDataset(wave, query_anns, window_size, hop_size, sample_rate, tf_transform)
+            neg_dataset = dcase_dataset.PrototypeDataset(wave, gap_anns, window_size, window_size//16, sample_rate, tf_transform)
+            pos_dataset = dcase_dataset.PrototypeDataset(wave, pos_anns, window_size, window_size//16, sample_rate, tf_transform)
             
-            q_embedding_times = valid_dataset_all.intervals
+            query_loader = torch.utils.data.DataLoader(query_dataset, batch_size=64, shuffle=False, num_workers=8)
+            neg_loader = torch.utils.data.DataLoader(neg_dataset, batch_size=64, shuffle=False, num_workers=8)
+            pos_loader = torch.utils.data.DataLoader(pos_dataset, batch_size=64, shuffle=False, num_workers=8)
 
-#             q_embeddings, q_embedding_times = evaluate_model.create_query_embeddings(model, wav_path, sample_rate, window_size, hop_size, tf_transform)
-
-            print(q_embeddings.shape)
-            print(q_embedding_times.shape)
+            q_embeddings = evaluate_model.create_embeddings(model, query_loader)
+            q_embedding_times = np.array(query_dataset.times)
+            
+            p_embeddings = evaluate_model.create_embeddings(model, pos_loader)
+            n_embeddings = evaluate_model.create_embeddings(model, neg_loader)
             
             embeddings_dir = os.path.join(experiment_path, "embeddings", os.path.basename(csv_path).split('.')[0])
             

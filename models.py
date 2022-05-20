@@ -10,6 +10,10 @@ def get_model(name, n_classes, n_time, n_mels, n_bins):
 
     elif name == "resnet":
         return ResNet(n_classes, n_time)
+    elif name == "resnet_1024":
+        return ResNet(n_classes, n_time, downpool_layers=[True, True, False, False])
+    elif name == "resnet_2048":
+        return ResNet(n_classes, n_time, downpool_layers=[True, True, True, False])
     elif name == "resnet_small":
         return ResNet(n_classes, n_time, small=True)
     elif name == "resnet_big":
@@ -70,7 +74,7 @@ def conv3x3(in_planes, out_planes, stride=1):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, drop_rate=0.0, drop_block=False, block_size=1):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, drop_rate=0.0, drop_block=False, block_size=1, downpool=True):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(inplanes, planes)
         self.bn1 = nn.BatchNorm2d(planes)
@@ -86,6 +90,7 @@ class BasicBlock(nn.Module):
         self.num_batches_tracked = 0
         self.drop_block = drop_block
         self.block_size = block_size
+        self.downpool = downpool
         
 
     def forward(self, x):
@@ -108,7 +113,8 @@ class BasicBlock(nn.Module):
             residual = self.downsample(x)
         out += residual
         out = self.relu(out)
-        out = self.maxpool(out)
+        if self.downpool:
+            out = self.maxpool(out)
         out = F.dropout(out, p=self.drop_rate, training=self.training, inplace=True)
         
                 
@@ -118,7 +124,7 @@ class BasicBlock(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, n_classes, n_time, small=False, block=BasicBlock, keep_prob=1.0, avg_pool=True, drop_rate=0.1, dropblock_size=5, n_layer1 = 32, n_layer2 = 32, n_layer3 = 32, n_layer4 = 32):
+    def __init__(self, n_classes, n_time, small=False, block=BasicBlock, keep_prob=1.0, avg_pool=True, drop_rate=0.1, dropblock_size=5, n_layer1 = 32, n_layer2 = 32, n_layer3 = 32, n_layer4 = 32, downpool_layers=[True, True, True, True]):
         self.inplanes = 1
         super(ResNet, self).__init__()
         # settings
@@ -130,12 +136,12 @@ class ResNet(nn.Module):
         embedding_dim = 128
 
         self.small = small
-        self.layer1 = self._make_layer(block, n_layer1, stride=2, drop_rate=drop_rate)
-        self.layer2 = self._make_layer(block, n_layer2, stride=2, drop_rate=drop_rate)
-        self.layer3 = self._make_layer(block, n_layer3, stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size)
+        self.layer1 = self._make_layer(block, n_layer1, stride=2, drop_rate=drop_rate, downpool=downpool_layers[0])
+        self.layer2 = self._make_layer(block, n_layer2, stride=2, drop_rate=drop_rate, downpool=downpool_layers[1])
+        self.layer3 = self._make_layer(block, n_layer3, stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size, downpool=downpool_layers[2])
 
         if not small:
-            self.layer4 = self._make_layer(block, n_layer4, stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size)
+            self.layer4 = self._make_layer(block, n_layer4, stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size, downpool=downpool_layers[3])
 
         if avg_pool:
             self.avgpool = nn.AvgPool2d(5, stride=1)
@@ -163,7 +169,7 @@ class ResNet(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def _make_layer(self, block, planes, stride=1, drop_rate=0.0, drop_block=False, block_size=1):
+    def _make_layer(self, block, planes, stride=1, drop_rate=0.0, drop_block=False, block_size=1, downpool=True):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
@@ -173,7 +179,7 @@ class ResNet(nn.Module):
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, drop_rate, drop_block, block_size))
+        layers.append(block(self.inplanes, planes, stride, downsample, drop_rate, drop_block, block_size, downpool=downpool))
         self.inplanes = planes * block.expansion
 
         return nn.Sequential(*layers)

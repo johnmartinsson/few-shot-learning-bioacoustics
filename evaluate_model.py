@@ -14,7 +14,7 @@ import dcase_evaluation
 
 def create_embeddings(model, data_loader):
     embeddings   = []
-    for x in data_loader:
+    for x in tqdm.tqdm(data_loader):
         x = x.view((x.shape[0], 1, x.shape[1], x.shape[2])).double()
         x = x.cuda()
         _, embedding = model(x)     

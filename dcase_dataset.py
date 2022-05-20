@@ -25,10 +25,14 @@ class PrototypeDataset(torch.utils.data.Dataset):
             # TODO: consider how to expand this in the best way
             if window_size - ann_window_size > 0:
                 to_pad = window_size - ann_window_size
+                #repeats = int(np.ceil(window_size / ann_window_size))
+                wave_segment = wave[start_idx:end_idx]
+                #wave_segment = np.repeat(wave_segment, repeats)[:window_size]
             else:
                 to_pad = 0
+                wave_segment = wave[start_idx:end_idx]
 
-            wave_segment = wave[start_idx:end_idx]
+
             wave_segment = np.pad(wave_segment, int(np.ceil(to_pad / 2)))
             wave_segments, segment_times = sed_utils.split_into_segments(wave_segment, sample_rate, hop_size, window_size)
             segment_times = [(x[0] + start_time, x[1] + start_time) for x in segment_times]

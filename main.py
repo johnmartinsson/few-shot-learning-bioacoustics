@@ -8,27 +8,34 @@ root_path_valid = '/mnt/storage_1/datasets/bioacoustics_dcase2022/Development_Se
 
 #tf_transform_name = 'pcen_biodiversity'
 n_background = 0 #1000
-n_time = 16
-window_size = 4096 * 2
-n_mels = 128 #80
+n_time = 32
+window_size = 4096
+n_mels = 128
 tf_transform_name = 'pcen_biodiversity'
 
-window_sizes = [4096, 2048]
+n_backgrounds = [100, 500, 1000] #window_sizes = [1024*2]
 
-for window_size in window_sizes:
-    experiment_dir = 'experiments/resnet_big/sample_rate_{}/{}/window_size_{}/n_background_{}/n_time_{}/n_mels_{}/'.format(sample_rate, tf_transform_name, window_size, n_background, n_time, n_mels)
+for n_background in n_backgrounds:
+    experiment_dir = 'experiments/n_background/window_size_{}/n_background_{}/n_time_{}/n_mels_{}/'.format(window_size, n_background, n_time, n_mels)
     print("running experiment: {} ...".format(experiment_dir))
+
+    if window_size == 1024:
+        model_name = "resnet_1024"
+    elif window_size == 2048:
+        model_name = "resnet_2048"
+    else:
+        model_name = "resnet"
 
     train_conf = {
         'csv_paths' : glob.glob(os.path.join(root_path_train, '*/*.csv')),
         # model
-        'model_name' : 'resnet_big',
+        'model_name' : model_name,
         # training settings
         'epochs'        : 1000,
         'learning_rate' : 1e-3,
-        'patience'      : 5,
+        'patience'      : 10,
         'batch_size'    : 64,
-        'nb_runs'       : 2,
+        'nb_runs'       : 1,
         'epoch_downstream_eval' : 5, # evaluate every nth epoch
         
         # data settings
