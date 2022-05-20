@@ -4,67 +4,27 @@ import torch.nn.functional as F
 import torch
 from collections import OrderedDict
 
-def get_model(name, n_classes, n_time, n_mels, n_bins):
-    if name == "protonet":
-        return ProtoNet(n_classes, n_time, n_mels, n_bins)
-
-    elif name == "resnet":
+def get_model(name, n_classes, n_time):
+    if name == "resnet":
         return ResNet(n_classes, n_time)
+    elif name == "resnet_256":
+        return ResNet(n_classes, n_time, downpool_layers=[False, False, False, False])
+    elif name == "resnet_512":
+        return ResNet(n_classes, n_time, downpool_layers=[True, False, False, False])
     elif name == "resnet_1024":
         return ResNet(n_classes, n_time, downpool_layers=[True, True, False, False])
     elif name == "resnet_2048":
         return ResNet(n_classes, n_time, downpool_layers=[True, True, True, False])
-    elif name == "resnet_small":
-        return ResNet(n_classes, n_time, small=True)
+    elif name == "resnet_4096":
+        return ResNet(n_classes, n_time, downpool_layers=[True, True, True, True])
+    elif name == "resnet_8192":
+        return ResNet(n_classes, n_time, downpool_layers=[True, True, True, True])
+    elif name == "resnet_16384":
+        return ResNet(n_classes, n_time, downpool_layers=[True, True, True, True])
     elif name == "resnet_big":
-        return ResNet(n_classes, n_time, small=True, n_layer1=64, n_layer2=128, n_layer3=256)
+        return ResNet(n_classes, n_time, n_layer1=64, n_layer2=128, n_layer3=256)
     else:
         raise ValueError("model with name {} not defined ... ")
-
-def conv_block(in_channels,out_channels):
-
-    return nn.Sequential(
-        nn.Conv2d(in_channels,out_channels,3,padding=1),
-        nn.BatchNorm2d(out_channels),
-        nn.ReLU(),
-        nn.MaxPool2d(2)
-    )
-
-class ProtoNet(nn.Module):
-    def __init__(self, n_classes, n_time, n_mels, n_bins):
-        super(ProtoNet,self).__init__()
-
-        scale_x = n_bins / 16
-        scale_y = n_mels / 40
-        
-        scale = int(scale_x * scale_y)
-
-        self.encoder = nn.Sequential(
-            conv_block(1,64),
-            conv_block(64,64),
-            conv_block(64,64),
-            conv_block(64,64)
-        )
-        self.fc1 = nn.Linear(128 * scale, 128)
-        self.dropout = nn.Dropout(0.3)
-        self.fc2 = nn.Linear(128, n_classes*n_time)
-
-        self.n_classes = n_classes
-        self.n_time    = n_time
-
-    def forward(self,x):
-        x = self.encoder(x)
-        #x_rep = nn.MaxPool2d(2)(x)
-        x = torch.flatten(x, 1)
-        x = self.fc1(x)
-        x_rep = F.relu(x)
-        x = self.dropout(x_rep)
-        x = self.fc2(x)
-        #x = F.relu(x)
-
-        y_pred = x.view((-1, self.n_classes, self.n_time))
-
-        return y_pred, x_rep
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
@@ -124,24 +84,17 @@ class BasicBlock(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, n_classes, n_time, small=False, block=BasicBlock, keep_prob=1.0, avg_pool=True, drop_rate=0.1, dropblock_size=5, n_layer1 = 32, n_layer2 = 32, n_layer3 = 32, n_layer4 = 32, downpool_layers=[True, True, True, True]):
+    def __init__(self, n_classes, n_time, block=BasicBlock, keep_prob=1.0, avg_pool=True, drop_rate=0.1, dropblock_size=5, n_layer1 = 32, n_layer2 = 32, n_layer3 = 32, n_layer4 = 32, downpool_layers=[True, True, True, True]):
         self.inplanes = 1
         super(ResNet, self).__init__()
         # settings
         pooling_size = (4,2)
-        #n_layer1 = 32 #32
-        #n_layer2 = 32 #64
-        #n_layer3 = 32 #128
-        #n_layer4 = 32 #256
         embedding_dim = 128
 
-        self.small = small
         self.layer1 = self._make_layer(block, n_layer1, stride=2, drop_rate=drop_rate, downpool=downpool_layers[0])
         self.layer2 = self._make_layer(block, n_layer2, stride=2, drop_rate=drop_rate, downpool=downpool_layers[1])
         self.layer3 = self._make_layer(block, n_layer3, stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size, downpool=downpool_layers[2])
-
-        if not small:
-            self.layer4 = self._make_layer(block, n_layer4, stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size, downpool=downpool_layers[3])
+        self.layer4 = self._make_layer(block, n_layer4, stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size, downpool=downpool_layers[3])
 
         if avg_pool:
             self.avgpool = nn.AvgPool2d(5, stride=1)
@@ -151,10 +104,7 @@ class ResNet(nn.Module):
         self.drop_rate = drop_rate
         self.pool = nn.AdaptiveAvgPool2d(pooling_size)
 
-        if small:
-            self.fc1 = nn.Linear(np.prod(pooling_size)*n_layer3, embedding_dim)
-        else:
-            self.fc1 = nn.Linear(np.prod(pooling_size)*n_layer4, embedding_dim)
+        self.fc1 = nn.Linear(np.prod(pooling_size)*n_layer4, embedding_dim)
 
         self.dropout = nn.Dropout(0.3)
         self.fc2 = nn.Linear(embedding_dim, n_classes*n_time)
@@ -185,23 +135,12 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        #print(x.shape)
-        #(num_samples,seq_len,mel_bins) = x.shape
-        #x = x.view(-1,1,seq_len,mel_bins)
-
-        #print("x shape 0: ", x.shape)
         x = self.layer1(x)
-        #print("x shape 1: ", x.shape)
         x = self.layer2(x)
-        #print("x shape 2: ", x.shape)
         x = self.layer3(x)
-        #print("x shape 3: ", x.shape)
-        if not self.small:
-            x = self.layer4(x)
-        #print("x shape 4: ", x.shape)
+        x = self.layer4(x)
         
         x = self.pool(x)
-        #print("x (pool) shape: ", x.shape)
 
         # flatten
         x = x.view(x.size(0), -1)

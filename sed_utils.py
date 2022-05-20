@@ -4,7 +4,7 @@ import numpy as np
 
 import time
 
-def get_tf_tramsform(name, n_mels, sample_rate):
+def get_tf_transform(name, n_mels, sample_rate):
     bioacoustic_conf = get_bioacoustic_pcen_conf()
     speech_conf      = get_speech_pcen_conf()
     tf_transforms = {
@@ -148,22 +148,7 @@ def compute_interval_intersection_over_union(i1, i2):
     else:
         return intersection/union
 
-# TODO: write a test for this    
-def get_segment_annotation(segment_interval, annotation_interval, sample_rate, window_size):
-    # time relative segment
-    s_s = segment_interval[0] - segment_interval[0]
-    s_e = segment_interval[1] - segment_interval[0]
-    
-    a_s = annotation_interval[0] - segment_interval[0]
-    a_e = annotation_interval[1] - segment_interval[0]
-    
-    segment_annotation = np.zeros(window_size)
-    segment_indices    = np.arange(window_size)
-    annotation_indices = np.arange(int(np.floor(a_s * sample_rate)), int(np.floor(a_e * sample_rate)))
-    segment_annotation[np.intersect1d(segment_indices, annotation_indices)] = 1
-    return segment_annotation
-    
-def get_segments_and_labels_new(wave, sample_rate, annotation_df, n_shot, n_background, hop_size, window_size, n_classes, n_time, get_label_fn):
+def get_segments_and_labels(wave, sample_rate, annotation_df, n_shot, n_background, hop_size, window_size, n_classes, n_time, get_label_fn):
     segments, segment_intervals = split_into_segments(wave, sample_rate, hop_size, window_size)
 
     # TODO: this needs optimization ...
@@ -227,76 +212,6 @@ def get_segments_and_labels_new(wave, sample_rate, annotation_df, n_shot, n_back
         
         return signal_segments, signal_segment_targets, signal_intervals, background_segments, background_segment_targets, background_intervals
 
- 
-def get_segments_and_labels(wave, sample_rate, annotation_df, n_shot, n_background, hop_size, window_size, n_classes, n_time, get_label_fn):
-    
-    t1 = time.time()
-    segments, segment_intervals = split_into_segments(wave, sample_rate, hop_size, window_size)
-        
-    
-    segment_targets = np.zeros((len(segments), n_classes, n_time))
-    annotation_intervals, labels = get_annotation_intervals_and_labels(annotation_df, get_label_fn)
-
-    # TODO: adding the possibility to only load the first n-shot annotations
-    annotation_intervals = annotation_intervals[:n_shot]
-    labels = labels[:n_shot]
-    t2 = time.time()
-    #print("before nested loop time: ", t2-t1)
-
-    # TODO: this needs optimization ...
-    t1 = time.time()
-    for seg_idx, segment_interval in enumerate(segment_intervals):
-        for (annotation_interval, label) in zip(annotation_intervals, labels):
-            iou = compute_interval_intersection_over_union(segment_interval, annotation_interval)
-            if iou > 0:
-                # update target vector
-                class_idx = label
-                segment_annotation = get_segment_annotation(segment_interval, annotation_interval, sample_rate, window_size)
-                
-                # max pooling (downsample the target vector)
-                annotation_segments, _ = split_into_segments(segment_annotation, sample_rate, window_size//n_time, window_size//n_time)
-                annotation = np.max(annotation_segments, axis=1)
-                
-                segment_targets[seg_idx, class_idx,:] += annotation
-    t2 = time.time()
-    #print("nested loop time: ", t2-t1)
-
-    t1 = time.time()
-    segment_targets = np.clip(segment_targets, 0, 1) # target range [0,1]
-    
-    #print("classify_with_annotation: ", t2-t1)
-    
-    # bool_idx for signal and background
-    signal_bool_idx     = np.sum(segment_targets[:,0:n_classes,:], axis=(1, 2)) > 0 # sum over class and time dimension
-    background_bool_idx = np.sum(segment_targets[:,0:n_classes,:], axis=(1, 2)) == 0 # sum over class and time dimension
-
-    signal_segments = segments[signal_bool_idx,:]
-    signal_segment_targets = segment_targets[signal_bool_idx,:,:]
-    
-    background_segments = segments[background_bool_idx,:]
-    background_segment_targets = segment_targets[background_bool_idx,:,:]
-
-    signal_intervals     = np.array(segment_intervals)[signal_bool_idx]
-    background_intervals = np.array(segment_intervals)[background_bool_idx]
-    t2 = time.time()
-    #print("after nested loop time: ", t2-t1)
-
-    #print("#background segments: ", len(background_segments))
-    
-    if len(background_segments) < len(signal_segments):
-        return signal_segments, signal_segment_targets, signal_intervals, background_segments, background_segment_targets, background_intervals
-    else:
-        # TODO: maybe think a bit more about this. Mainly done to save memory space.
-        #n_sample = min(len(background_segments), n_background) # can only sample as many as there is
-        #background_random_idx = np.random.choice(np.arange(len(background_segments)), n_sample, replace=False) # sample background signals
-        background_segments = background_segments[:n_background] #background_random_idx]
-        background_segment_targets = background_segment_targets[:n_background] #background_random_idx]
-
-        background_intervals = background_intervals[:n_background] #background_random_idx]
-        
-        return signal_segments, signal_segment_targets, signal_intervals, background_segments, background_segment_targets, background_intervals
-
-    
 def load_wave(wav_path):
     wave, sample_rate = librosa.load(wav_path, sr=None)
     wave = wave * (2**31) # rescale according to recommendation for PCEN in librosa

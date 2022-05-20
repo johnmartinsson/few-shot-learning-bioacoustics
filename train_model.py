@@ -57,24 +57,22 @@ def evaluate(model, loader, loss_function):
     return running_loss / count
 
 def main(experiment_dir, train_conf, downstream_eval_conf):
-    #root_path = train_conf['root_path']
     csv_paths = train_conf['csv_paths']
     # Model settings
     model_name = train_conf['model_name']
 
     # Training settings
-    epochs        = train_conf['epochs'] #1000
-    learning_rate = train_conf['learning_rate'] #1e-3 #[1e-2, 1e-3, 3e-4, 1e-4, 1e-5]
-    patience      = train_conf['patience'] #10
-    batch_size    = train_conf['batch_size'] #64
-    nb_runs       = train_conf['nb_runs'] #10 #5
+    epochs        = train_conf['epochs']
+    learning_rate = train_conf['learning_rate']
+    patience      = train_conf['patience']
+    batch_size    = train_conf['batch_size']
+    nb_runs       = train_conf['nb_runs']
     epoch_downstream_eval = train_conf['epoch_downstream_eval']
 
     # Data settings
     n_classes    = train_conf['n_classes']
     n_time       = train_conf['n_time']
     n_mels       = train_conf['n_mels']
-    n_bins       = None # TODO: fix this!
     tf_transform_name = train_conf['tf_transform']
 
     window_size  = train_conf['window_size']
@@ -83,18 +81,10 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
     sample_rate  = train_conf['sample_rate']
 
     # choose time-frequency transform
-    conf_bio    = sed_utils.get_bioacoustic_pcen_conf()
-    conf_speech = sed_utils.get_speech_pcen_conf()
-    tf_transforms = {
-            'decibel'           : lambda x: sed_utils.wav_to_mel(x - (np.sum(x)/np.size(x)), sample_rate, n_mels=n_mels),
-            'pcen_biodiversity' : lambda x: sed_utils.wav_to_pcen(x - (np.sum(x)/np.size(x)), sample_rate, conf_bio, n_mels=n_mels),
-            'pcen_speech'       : lambda x: sed_utils.wav_to_pcen(x - (np.sum(x)/np.size(x)), sample_rate, conf_speech, n_mels=n_mels),
-    }
+    tf_transform = sed_utils.get_tf_transform(tf_transform_name, sample_rate=sample_rate, n_mels=n_mels)
 
-    tf_transform = tf_transforms[tf_transform_name]
-
-    # load the dataset
-    base_dataset = dcase_dataset.BioacousticDatasetNew(
+    # load the base dataset
+    base_dataset = dcase_dataset.BioacousticDataset(
 	csv_paths          = csv_paths,
 	window_size        = window_size,
 	hop_size           = hop_size,
@@ -103,17 +93,12 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
 	n_time             = n_time,
 	n_background       = n_background,
 	transform          = tf_transform,
-	cache              = False,
-	is_validation_data = False,
-        use_old            = False
     )
 
     # split data
     train_size = int(0.8 * len(base_dataset))
     valid_size = len(base_dataset) - train_size
     base_train, base_valid = torch.utils.data.random_split(base_dataset, [train_size, valid_size])
-    print("training x shape: ", base_train[0][0].shape)
-    print("training y shape: ", base_train[0][1].shape)
 
     print("start training ...")
     for idx_run in range(nb_runs):
@@ -122,10 +107,10 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
         writer = torch.utils.tensorboard.SummaryWriter(log_dir=experiment_path)
 
         print("moving model to gpu ...")
-        model = models.get_model(model_name, n_classes, n_time, n_mels, n_bins).double()
+        model = models.get_model(model_name, n_classes, n_time).double()
         model = model.cuda()
         # just a copy of the model
-        best_model = models.get_model(model_name, n_classes, n_time, n_mels, n_bins).double()
+        best_model = models.get_model(model_name, n_classes, n_time).double()
         best_model = best_model.cuda()
 
         optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
