@@ -20,8 +20,8 @@ normalize_energy = False
 normalize_input = True
 model_name = 'resnet_{}'.format(window_size)
 
-for n_layer in [64, 32]:
-    for embedding_dim in [1024, 512, 128]:
+for n_layer in [64]:
+    for embedding_dim in [512, 128]:
         experiment_dir = 'experiments/model_size/tf_{}/n_layer_{}/embedding_dim_{}/'.format(tf_transform_name, n_layer, embedding_dim)
         print("running experiment: {} ...".format(experiment_dir))
 
@@ -37,7 +37,7 @@ for n_layer in [64, 32]:
             'learning_rate' : 1e-3,
             'patience'      : 100,
             'batch_size'    : 64,
-            'nb_runs'       : 5,
+            'nb_runs'       : 3,
             'epoch_downstream_eval' : 5, # evaluate every nth epoch
             
             # data settings

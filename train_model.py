@@ -16,7 +16,8 @@ def train(model, optimizer, loss_function, train_loader):
     running_loss = 0
     count = 0
     for (x, y) in tqdm.tqdm(train_loader):
-        x = x.view((x.shape[0], 1, x.shape[1], x.shape[2])).double() # add channel dimension
+        #x = x.view((x.shape[0], 1, x.shape[1], x.shape[2])).double() # add channel dimension
+        x = x.double()
         x = x.cuda()
         y = y.double()
         y = y.cuda()
@@ -43,7 +44,8 @@ def evaluate(model, loader, loss_function):
     ys = []
     ys_pred = []
     for (x, y) in tqdm.tqdm(loader):
-        x = x.view((x.shape[0], 1, x.shape[1], x.shape[2])).double() # add channel dimension
+        #x = x.view((x.shape[0], 1, x.shape[1], x.shape[2])).double() # add channel dimension
+        x = x.double()
         x = x.cuda()
         y = y.double()
         y = y.cuda()
@@ -60,6 +62,9 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
     csv_paths = train_conf['csv_paths']
     # Model settings
     model_name = train_conf['model_name']
+    embedding_dim = train_conf['embedding_dim']
+    n_layer = train_conf['n_layer']
+    channels = train_conf['channels']
 
     # Training settings
     epochs        = train_conf['epochs']
@@ -79,9 +84,11 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
     hop_size     = train_conf['hop_size']
     n_background = train_conf['n_background']
     sample_rate  = train_conf['sample_rate']
+    normalize_input = train_conf['normalize_input']
 
     # choose time-frequency transform
-    tf_transform = sed_utils.get_tf_transform(tf_transform_name, sample_rate=sample_rate, n_mels=n_mels)
+    normalize_energy = train_conf['normalize_energy']
+    tf_transform = sed_utils.get_tf_transform(tf_transform_name, sample_rate=sample_rate, n_mels=n_mels, normalize=normalize_energy)
 
     # load the base dataset
     base_dataset = dcase_dataset.BioacousticDataset(
@@ -93,7 +100,9 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
 	n_time             = n_time,
 	n_background       = n_background,
 	transform          = tf_transform,
+        normalize          = normalize_input,
     )
+
 
     # split data
     train_size = int(0.8 * len(base_dataset))
@@ -104,14 +113,21 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
     for idx_run in range(nb_runs):
         experiment_path = os.path.join(experiment_dir, 'run_{}'.format(idx_run))
 
+        if not os.path.exists(experiment_path):
+            os.makedirs(experiment_path)
+
+        if normalize_input:
+            np.save(os.path.join(experiment_path, "mean.npy"), base_dataset.mean)
+            np.save(os.path.join(experiment_path, "std.npy"), base_dataset.std)
+
         writer = torch.utils.tensorboard.SummaryWriter(log_dir=experiment_path)
 
         print("moving model to gpu ...")
-        model = models.get_model(model_name, n_classes, n_time).double()
+        model = models.get_model(model_name, n_classes, n_time, embedding_dim=embedding_dim, n_layer=n_layer, channels=channels).double()
         model = model.cuda()
         # just a copy of the model
-        best_model = models.get_model(model_name, n_classes, n_time).double()
-        best_model = best_model.cuda()
+        #best_model = models.get_model(model_name, n_classes, n_time).double()
+        #best_model = best_model.cuda()
 
         optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
         loss_function = torch.nn.BCEWithLogitsLoss()
@@ -124,6 +140,7 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
         best_epoch = 0
         epoch = 0
         not_converged = True
+        best_fmeasure = 0
 
         while not_converged:
             # evaluate
@@ -135,8 +152,8 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
                 print("saving best model ...")
                 best_valid_loss = valid_loss
                 best_epoch = epoch
-                best_model.load_state_dict(model.state_dict())
-                torch.save(best_model.state_dict(), os.path.join(experiment_path, "best_model.ckpt"))
+                #best_model.load_state_dict(model.state_dict())
+                torch.save(model.state_dict(), os.path.join(experiment_path, "best_model.ckpt"))
 
                 # save settings files
                 np.save(os.path.join(experiment_path, "train_conf.npy"), train_conf)
@@ -163,6 +180,12 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
                 writer.add_scalar('downstream_post/PB/fmeasure', post_scores_per_subset['PB']['f-measure'], epoch)
                 writer.add_scalar('downstream_post/HB/fmeasure', post_scores_per_subset['HB']['f-measure'], epoch)
 
+                if post_overall_scores['f-measure'] >= best_fmeasure:
+                    print("saving best downstream model ...")
+                    best_fmeasure = post_overall_scores['f-measure']
+                    torch.save(model.state_dict(), os.path.join(experiment_path, "best_downstream_model.ckpt"))
+
+
 
             # train model for one epoch
             train_loss = train(model, optimizer, loss_function, base_train_loader)
@@ -181,4 +204,4 @@ def main(experiment_dir, train_conf, downstream_eval_conf):
             # TODO: every nth epoch do a proper few-shot evaluation
 
         torch.save(model.state_dict(), os.path.join(experiment_path, "model_epochs_{}.ckpt".format(epoch)))
-        torch.save(best_model.state_dict(), os.path.join(experiment_path, "best_model.ckpt"))
+        #torch.save(best_model.state_dict(), os.path.join(experiment_path, "best_model.ckpt"))

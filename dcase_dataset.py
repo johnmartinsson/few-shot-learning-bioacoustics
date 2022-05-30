@@ -12,7 +12,10 @@ from sed_utils import load_wave, get_segments_and_labels
 import sed_utils
 
 class PrototypeDataset(torch.utils.data.Dataset):
-    def __init__(self, wave, annotations, window_size, hop_size, sample_rate, transform=None, padding='expand'):
+    def __init__(self, wave, annotations, window_size, hop_size, sample_rate, transform=None, padding='expand', normalize=False, mean=0, std=1):
+        self.normalize = normalize
+        self.mean = mean
+        self.std = std
 
         xs = []
         times = []
@@ -64,11 +67,16 @@ class PrototypeDataset(torch.utils.data.Dataset):
         x = self.x[idx]
         if self.transform:
             x = self.transform(x)
+            if self.normalize:
+                x = x - self.mean
+                x = x / self.std
+                #x = np.squeeze(x)
+
         return x
 
 class BioacousticDataset(torch.utils.data.Dataset):
     """Bioacoustic dataset."""
-    def __init__(self, csv_paths, window_size, hop_size, sample_rate, n_classes, n_time, n_shot=1000000, n_background=1000000, transform=None):
+    def __init__(self, csv_paths, window_size, hop_size, sample_rate, n_classes, n_time, n_shot=1000000, n_background=1000000, transform=None, normalize=True):
         """
         Args:
                 csv_paths       : All annotation files.
@@ -80,6 +88,7 @@ class BioacousticDataset(torch.utils.data.Dataset):
                 n_background    : The maximum number of background segments to load.
                 transform       : Optional transform to be applied on a sample.
         """
+        self.normalize = normalize
         self.sample_rate = sample_rate
         self.transform = transform
         get_label_fn = get_label_train_fn
@@ -153,6 +162,29 @@ class BioacousticDataset(torch.utils.data.Dataset):
             self.x_bg = np.array([])
             self.y_bg = np.array([])
 
+        # compute the mean and std of the transforms
+        # only reason to keep wav formats is for future data augmentation
+        if self.transform:
+            x_sig_tf = []
+            x_bg_tf = []
+            for wav in tqdm.tqdm(self.x_sig):
+                x_sig_tf.append(np.expand_dims(self.transform(wav), axis=0))
+            for wav in tqdm.tqdm(self.x_bg):
+                x_bg_tf.append(np.expand_dims(self.transform(wav), axis=0))
+
+            #self.x_sig_tf = np.concatenate(x_sig_tf)
+            #if n_background > 0:
+            #    self.x_bg_tf = np.concatenate(x_bf_tf)
+            #else:
+            #    self.x_bg_tf = np.array([])
+
+            if self.normalize:
+                x = np.concatenate(x_sig_tf + x_bg_tf)
+                print(x.shape)
+
+                self.mean = np.mean(x, axis=0, keepdims=False)
+                self.std  = np.std(x, axis=0, keepdims=False)
+
     def __len__(self):
             return len(self.x_sig) + len(self.x_bg)
 
@@ -163,12 +195,20 @@ class BioacousticDataset(torch.utils.data.Dataset):
             # Keep track of both background and signal
             if idx < len(self.x_sig):
                 x = self.x_sig[idx]
+                #x_tf = self.x_sig_tf[idx]
                 y = self.y_sig[idx]
             else:
                 x = self.x_bg[idx-len(self.x_sig)]
+                #x_tf = self.x_bg_tf[idx-len(self.x_sig)]
                 y = self.y_bg[idx-len(self.x_sig)]
 
             if self.transform:
-                    x = self.transform(x)
+                x = self.transform(x)
+                #x = x_tf
+                if self.normalize:
+                    x = x - self.mean
+                    x = x / self.std
+                    #x = np.squeeze(x)
+
 
             return x, y

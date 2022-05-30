@@ -16,7 +16,8 @@ import stats_utils
 def create_embeddings(model, data_loader, verbose=False):
     embeddings   = []
     for x in tqdm.tqdm(data_loader, disable=(not verbose)):
-        x = x.view((x.shape[0], 1, x.shape[1], x.shape[2])).double()
+        #x = x.view((x.shape[0], 1, x.shape[1], x.shape[2])).double()
+        x = x.double()
         x = x.cuda()
         _, embedding = model(x)     
         embeddings.append(embedding.detach().cpu().numpy())
@@ -46,7 +47,7 @@ def evaluate(experiment_dir, conf):
             dataset        = 'VAL',
             savepath       = experiment_dir,
             metadata       = [],
-            verbose        = False
+            verbose        = True
     )
 
     post_pred_file_path = os.path.join(experiment_dir, 'post_processed_pred.csv')
@@ -57,7 +58,7 @@ def evaluate(experiment_dir, conf):
             dataset        = 'VAL',
             savepath       = experiment_dir,
             metadata       = [],
-            verbose        = False
+            verbose        = True
     )
 
     return overall_scores, scores_per_subset, post_overall_scores, post_scores_per_subset
@@ -90,11 +91,24 @@ def predict(experiment_dir, csv_paths, conf, verbose=False):
 
     # model settings
     model_name = conf['model_name']
-    padding = conf['padding']
+    embedding_dim = conf['embedding_dim']
+    n_layer = conf['n_layer']
+    channels = conf['channels']
 
-    tf_transform = sed_utils.get_tf_transform(tf_transform_name, n_mels, sample_rate)
+    padding = conf['padding']
+    normalize_input = conf['normalize_input']
+    normalize_energy = conf['normalize_energy']
+
+    tf_transform = sed_utils.get_tf_transform(tf_transform_name, n_mels, sample_rate, normalize=normalize_energy)
 
     window_sizes = np.array([256, 512, 1024, 2048, 4096, 8192])
+
+    if normalize_input:
+        mean = np.load(os.path.join(experiment_dir, "mean.npy"))
+        std = np.load(os.path.join(experiment_dir, "std.npy"))
+    else:
+        mean = 0
+        std = 1
 
     pos_events = []
     for csv_path in tqdm.tqdm(csv_paths, disable=(not verbose)):
@@ -117,7 +131,7 @@ def predict(experiment_dir, csv_paths, conf, verbose=False):
         ###############################################################################################################
         # Load the model
         ###############################################################################################################
-        model = models.get_model(model_name, n_classes, n_time)
+        model = models.get_model(model_name, n_classes, n_time, embedding_dim=embedding_dim, n_layer=n_layer, channels=channels)
         model = model.double()
         model_path = os.path.join(experiment_dir, 'best_model.ckpt')
         model.load_state_dict(torch.load(model_path))
@@ -133,9 +147,9 @@ def predict(experiment_dir, csv_paths, conf, verbose=False):
         gap_anns = stats_utils.get_gap_annotations(csv_path, n_shot, class_name='Q')
         query_anns = stats_utils.get_query_annotations(csv_path, n_shot, class_name='Q')
 
-        query_dataset = dcase_dataset.PrototypeDataset(wave, query_anns, window_size, hop_size, sample_rate, tf_transform)
-        neg_dataset = dcase_dataset.PrototypeDataset(wave, gap_anns, window_size, window_size//16, sample_rate, tf_transform, padding=padding)
-        pos_dataset = dcase_dataset.PrototypeDataset(wave, pos_anns, window_size, window_size//16, sample_rate, tf_transform, padding=padding)
+        query_dataset = dcase_dataset.PrototypeDataset(wave, query_anns, window_size, hop_size, sample_rate, tf_transform, normalize=normalize_input, mean=mean, std=std)
+        neg_dataset = dcase_dataset.PrototypeDataset(wave, gap_anns, window_size, window_size//16, sample_rate, tf_transform, padding=padding, normalize=normalize_input, mean=mean, std=std)
+        pos_dataset = dcase_dataset.PrototypeDataset(wave, pos_anns, window_size, window_size//16, sample_rate, tf_transform, padding=padding, normalize=normalize_input, mean=mean, std=std)
         
         query_loader = torch.utils.data.DataLoader(query_dataset, batch_size=64, shuffle=False, num_workers=8)
         neg_loader = torch.utils.data.DataLoader(neg_dataset, batch_size=64, shuffle=False, num_workers=8)

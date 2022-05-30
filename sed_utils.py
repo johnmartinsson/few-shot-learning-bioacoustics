@@ -4,13 +4,15 @@ import numpy as np
 
 import time
 
-def get_tf_transform(name, n_mels, sample_rate):
+def get_tf_transform(name, n_mels, sample_rate, normalize=False):
     bioacoustic_conf = get_bioacoustic_pcen_conf()
     speech_conf      = get_speech_pcen_conf()
     tf_transforms = {
-        'decibel'           : lambda x: wav_to_mel(x - (np.sum(x)/np.size(x)), sample_rate, n_mels=n_mels),
-        'pcen_biodiversity' : lambda x: wav_to_pcen(x - (np.sum(x)/np.size(x)), sample_rate, bioacoustic_conf, n_mels=n_mels),
-        'pcen_speech'       : lambda x: wav_to_pcen(x - (np.sum(x)/np.size(x)), sample_rate, speech_conf, n_mels=n_mels),
+        'decibel'           : lambda x: wav_to_mel(x - (np.sum(x)/np.size(x)), sample_rate, n_mels=n_mels, normalize=normalize),
+        'pcen_biodiversity' : lambda x: wav_to_pcen(x - (np.sum(x)/np.size(x)), sample_rate, bioacoustic_conf, n_mels=n_mels, normalize=normalize),
+        'pcen_speech'       : lambda x: wav_to_pcen(x - (np.sum(x)/np.size(x)), sample_rate, speech_conf, n_mels=n_mels, normalize=normalize),
+        'spectrogram'       : lambda x: wav_to_spec(x - (np.sum(x)/np.size(x)), sample_rate, n_bins=n_mels, normalize=normalize),
+        'stacked'           : lambda x: wav_to_stacked(x - (np.sum(x)/np.size(x)), sample_rate, n_mels=n_mels, normalize=normalize),
     }
     tf_transform = tf_transforms[name]
     return tf_transform
@@ -24,6 +26,10 @@ def my_frames_to_time(frames, sample_rate):
         window_size = 2*256 # ~25 ms
         hop_size    = 2*128 # 
         n_fft       = 2*256 # 
+    elif sample_rate > 44100:
+        window_size = 4*256 # ~25 ms
+        hop_size    = 4*128 # 
+        n_fft       = 4*256 # 
     else:
         raise ValueError("undefined for sample rate: {}".format(sample_rate))
 
@@ -46,7 +52,7 @@ def get_speech_pcen_conf():
 	'eps' : 1e-6    
     }
 
-def wav_to_pcen(wav, sample_rate, conf, n_mels=40):
+def wav_to_spec(wav, sample_rate, n_bins, normalize=False):
     if sample_rate == 11025:
         window_size = 256 # ~25 ms
         hop_size    = 128 # 
@@ -55,6 +61,44 @@ def wav_to_pcen(wav, sample_rate, conf, n_mels=40):
         window_size = 2*256 # ~25 ms
         hop_size    = 2*128 # 
         n_fft       = 2*256 # 
+    elif sample_rate > 44100:
+        window_size = 4*256 # ~25 ms
+        hop_size    = 4*128 # 
+        n_fft       = 4*256 # 
+    else:
+        raise ValueError("undefined for sample rate: {}".format(sample_rate))
+
+    D = librosa.stft(
+        wav,
+        n_fft = n_fft,
+        hop_length = hop_size,
+        win_length = window_size
+    )
+
+    #if normalize:
+    #    D = D / np.sum(D)
+
+    S = np.power(np.abs(D), 2)
+    S_spec = librosa.power_to_db(np.abs(D), ref=np.max)
+
+    if normalize:
+        S_spec = S_spec / np.sum(S_spec)
+
+    return S_spec
+
+def wav_to_pcen(wav, sample_rate, conf, n_mels=40, normalize=False):
+    if sample_rate == 11025:
+        window_size = 256 # ~25 ms
+        hop_size    = 128 # 
+        n_fft       = 256 # 
+    elif sample_rate == 22050:
+        window_size = 2*256 # ~25 ms
+        hop_size    = 2*128 # 
+        n_fft       = 2*256 # 
+    elif sample_rate > 44100:
+        window_size = 4*256 # ~25 ms
+        hop_size    = 4*128 # 
+        n_fft       = 4*256 # 
     else:
         raise ValueError("undefined for sample rate: {}".format(sample_rate))
 
@@ -66,6 +110,10 @@ def wav_to_pcen(wav, sample_rate, conf, n_mels=40):
         hop_length=hop_size,
         n_mels=n_mels     # used to derive default params for PCEN
     )
+
+    #if normalize:
+    #    D = D / np.sum(D)
+
     S_pcen = librosa.core.pcen(
         D, 
         sr=sample_rate,
@@ -75,9 +123,12 @@ def wav_to_pcen(wav, sample_rate, conf, n_mels=40):
         time_constant=conf['time_constant'],
         eps=conf['eps']
     )
-    return S_pcen
+    if normalize:
+        S_pcen = S_pcen / np.sum(S_pcen)
 
-def wav_to_mel(wav, sample_rate, n_mels=40):
+    return np.expand_dims(S_pcen, axis=0)
+
+def wav_to_mel(wav, sample_rate, n_mels=40, normalize=False):
     if sample_rate == 11025:
         window_size = 256 # ~25 ms
         hop_size    = 128 
@@ -86,6 +137,10 @@ def wav_to_mel(wav, sample_rate, n_mels=40):
         window_size = 2*256 # ~ 25 ms
         hop_size    = 2*128 
         n_fft       = 2*256 
+    elif sample_rate >= 44100:
+        window_size = 4*256 # ~25 ms
+        hop_size    = 4*128 # 
+        n_fft       = 4*256 # 
     else:
         raise ValueError("undefined for sample rate: {}".format(sample_rate))
 
@@ -97,8 +152,26 @@ def wav_to_mel(wav, sample_rate, n_mels=40):
         hop_length=hop_size,
         n_mels=n_mels
     )
+
+    #if normalize:
+    #    D = D / np.sum(D)
+
     S_db = librosa.power_to_db(np.abs(D), ref=np.max)
-    return S_db
+    if normalize:
+        S_db = S_db / np.sum(S_db)
+    return np.expand_dims(S_db, axis=0)
+
+def wav_to_stacked(wav, sample_rate, n_mels=40, normalize=False):
+    bio_conf    = get_bioacoustic_pcen_conf()
+    speech_conf = get_speech_pcen_conf()
+
+    S_mel = wav_to_mel(wav, sample_rate, n_mels=n_mels, normalize=normalize)
+    S_pcen_bio = wav_to_pcen(wav, sample_rate, bio_conf, n_mels=n_mels, normalize=normalize)
+    S_pcen_speeh = wav_to_pcen(wav, sample_rate, speech_conf, n_mels=n_mels, normalize=normalize)
+
+    S = np.concatenate((S_mel, S_pcen_bio, S_pcen_speeh), axis=0)
+
+    return S
 
 # TODO: Write a test for this
 # TODO: What if we store the indices instead of the audio?
@@ -174,7 +247,8 @@ def get_segments_and_labels(wave, sample_rate, annotation_df, n_shot, n_backgrou
         start_idx  = int(np.floor(start_time * sample_rate))
         end_idx    = int(np.ceil(end_time * sample_rate))
 
-        target[start_idx:end_idx, label] += 1
+        if label < n_classes:
+            target[start_idx:end_idx, label] += 1
 
     target = np.clip(target, 0, 1)
     segment_targets, segment_target_intervals = split_into_segments(target, sample_rate//scale, hop_size//scale, window_size//scale)

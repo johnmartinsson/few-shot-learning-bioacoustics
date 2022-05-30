@@ -7,8 +7,8 @@ root_path_train = '/mnt/storage_1/datasets/bioacoustics_dcase2022/Development_Se
 root_path_valid = '/mnt/storage_1/datasets/bioacoustics_dcase2022/Development_Set_{}Hz/Validation_Set/'.format(sample_rate)
 
 n_time = 16
-#n_layer = 32
-#embedding_dim = 128
+n_layer = 64
+embedding_dim = 1024
 
 n_mels = 128
 window_size = 4096
@@ -18,11 +18,10 @@ channels = 1
 n_background = 0
 normalize_energy = False
 normalize_input = True
-model_name = 'resnet_{}'.format(window_size)
 
-for n_layer in [64, 32]:
-    for embedding_dim in [1024, 512, 128]:
-        experiment_dir = 'experiments/model_size/tf_{}/n_layer_{}/embedding_dim_{}/'.format(tf_transform_name, n_layer, embedding_dim)
+for window_size in [1024, 2048, 8192, 4096]:
+        model_name = 'resnet_{}'.format(window_size)
+        experiment_dir = 'experiments/window_size/tf_{}/model_name_{}/window_size_{}/'.format(tf_transform_name, model_name, window_size)
         print("running experiment: {} ...".format(experiment_dir))
 
         train_conf = {
