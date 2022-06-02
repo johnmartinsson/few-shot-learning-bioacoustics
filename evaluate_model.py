@@ -14,15 +14,18 @@ import dcase_evaluation
 import stats_utils
 
 def create_embeddings(model, data_loader, verbose=False):
-    embeddings   = []
+    embeddings = []
+    probas     = []
     for x in tqdm.tqdm(data_loader, disable=(not verbose)):
         #x = x.view((x.shape[0], 1, x.shape[1], x.shape[2])).double()
         x = x.double()
         x = x.cuda()
-        _, embedding = model(x)     
+        logit, embedding = model(x)     
         embeddings.append(embedding.detach().cpu().numpy())
+        probas.append(torch.sigmoid(logit).detach().cpu().numpy())
+    probas = np.concatenate(probas)
     embeddings = np.concatenate(embeddings)
-    return embeddings
+    return embeddings, probas
 
 def evaluate(experiment_dir, conf):
     root_path = conf['root_path']
