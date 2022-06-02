@@ -77,7 +77,7 @@ def probability_query(query, n_prototype, p_prototype):
     
     return y_proba_p
 
-def predict(experiment_dir, csv_paths, conf, verbose=False):
+def predict(experiment_dir, csv_paths, conf, save_probas=False, verbose=False):
     # data settings
     n_classes = conf['n_classes']
     n_time = conf['n_time']
@@ -155,11 +155,11 @@ def predict(experiment_dir, csv_paths, conf, verbose=False):
         neg_loader = torch.utils.data.DataLoader(neg_dataset, batch_size=64, shuffle=False, num_workers=8)
         pos_loader = torch.utils.data.DataLoader(pos_dataset, batch_size=64, shuffle=False, num_workers=8)
 
-        q_embeddings = create_embeddings(model, query_loader)
+        q_embeddings, q_probas = create_embeddings(model, query_loader)
         q_embedding_times = np.array(query_dataset.times)
         
-        p_embeddings = create_embeddings(model, pos_loader)
-        n_embeddings = create_embeddings(model, neg_loader)
+        p_embeddings, _ = create_embeddings(model, pos_loader)
+        n_embeddings, _ = create_embeddings(model, neg_loader)
 
         n_prototype = np.mean(n_embeddings, axis=0)
         p_prototype = np.mean(p_embeddings, axis=0)
@@ -174,6 +174,19 @@ def predict(experiment_dir, csv_paths, conf, verbose=False):
             y_probas.append(y_proba)
 
         sorted_predicitions, sorted_intervals = zip(*sorted(list(zip(y_probas, q_embedding_times)), key=lambda x: x[1][0]))
+        #############################################################
+        # Store probas
+        basename = os.path.basename(csv_path).split('.')[0]
+        prediction_path = os.path.join(experiment_path, 'predictions', '{}_predictions.npy'.format(basename))
+        base_prediction_path = os.path.join(experiment_path, 'predictions', '{}_base_predictions.npy'.format(basename))
+        # save predictions
+        if not os.path.exists(os.path.dirname(prediction_path)):
+            os.makedirs(os.path.dirname(prediction_path))
+
+        print("saving prediction: ", prediction_path)
+        np.save(prediction_path, y_preds)
+        np.save(base_prediction_path, q_probas)
+        #############################################################
 
         # Get the 5th annotated positive event, and set the end of that
         # event as the skiptime. (Remove all predictions before.)
