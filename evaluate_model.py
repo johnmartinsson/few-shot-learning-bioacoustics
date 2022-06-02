@@ -177,18 +177,23 @@ def predict(experiment_dir, csv_paths, conf, save_probas=False, verbose=False):
             y_probas.append(y_proba)
 
         sorted_predicitions, sorted_intervals = zip(*sorted(list(zip(y_probas, q_embedding_times)), key=lambda x: x[1][0]))
+        sorted_q_probas, sorted_intervals = zip(*sorted(list(zip(q_probas, q_embedding_times)), key=lambda x: x[1][0]))
         #############################################################
         # Store probas
-        basename = os.path.basename(csv_path).split('.')[0]
-        prediction_path = os.path.join(experiment_path, 'predictions', '{}_predictions.npy'.format(basename))
-        base_prediction_path = os.path.join(experiment_path, 'predictions', '{}_base_predictions.npy'.format(basename))
-        # save predictions
-        if not os.path.exists(os.path.dirname(prediction_path)):
-            os.makedirs(os.path.dirname(prediction_path))
+        if save_probas:
+            basename = os.path.basename(csv_path).split('.')[0]
+            prediction_path = os.path.join(experiment_dir, 'predictions', '{}_predictions.npy'.format(basename))
+            times_path = os.path.join(experiment_dir, 'predictions', '{}_times.npy'.format(basename))
+            #base_prediction_path = os.path.join(experiment_dir, 'predictions', '{}_base_predictions.npy'.format(basename))
+            # save predictions
+            if not os.path.exists(os.path.dirname(prediction_path)):
+                os.makedirs(os.path.dirname(prediction_path))
 
-        print("saving prediction: ", prediction_path)
-        np.save(prediction_path, y_preds)
-        np.save(base_prediction_path, q_probas)
+            print("saving prediction: ", prediction_path)
+            np.save(prediction_path, sorted_predicitions)
+            np.save(times_path, sorted_intervals)
+            #print("saving base prediction: ", base_prediction_path)
+            #np.save(base_prediction_path, sorted_q_probas)
         #############################################################
 
         # Get the 5th annotated positive event, and set the end of that
