@@ -1,7 +1,7 @@
 # DCASE bioacoustics 2022
 The official repository for the source code of the method presented in the paper:
 
-    - "Few-shot bioacoustic event detection using an event-length adapted ensemble of prototypical neural networks".
+    "Few-shot bioacoustic event detection using an event-length adapted ensemble of prototypical neural networks".
 
 The method came in third place among the team submissions in the [few-shot bioacoustic event detection task](https://dcase.community/challenge2022/task-few-shot-bioacoustic-event-detection-results) during the DCASE 2022 challenge.
 
