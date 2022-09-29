@@ -18,6 +18,8 @@ We will
 - rename (or copy) the directory, 
 - and resample all the audio data to 22050Hz __in-place__.
 
+A suggestion of commands to do so:
+
     cd data
     wget https://zenodo.org/record/6482837/files/Development_Set.zip
     unzip Development_Set.zip
