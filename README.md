@@ -23,7 +23,7 @@ A suggestion of commands to do so:
     cd data
     wget https://zenodo.org/record/6482837/files/Development_Set.zip
     unzip Development_Set.zip
-    mv Development_Set Development_Set_22050Hz # or cp -r Development_Set Development_Set_22050Hz (if you want to keep a copy)
+    mv Development_Set Development_Set_22050Hz # cp -r Development_Set Development_Set_22050Hz  # (if you want to keep a copy)
     sh resample.sh
 
 ## Pre-process the data 
