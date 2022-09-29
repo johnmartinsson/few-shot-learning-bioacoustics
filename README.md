@@ -27,3 +27,12 @@ TODO
 
 ## Produce plots
 TODO
+
+## Train models
+Assuming you have access to three GPU:s, a simple way to train the ensemble would be:
+
+    CUDA_VISIBLE_DEVICES=0 python main.py pcen_speech
+    CUDA_VISIBLE_DEVICES=1 python main.py pcen_biodiversity
+    CUDA_VISIBLE_DEVICES=2 python main.py decibel
+    
+the models should be in the 'experiments/final_ensemble' directory.
