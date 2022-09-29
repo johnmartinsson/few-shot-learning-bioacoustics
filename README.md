@@ -8,12 +8,13 @@ The method came in third place among the team submissions in the [few-shot bioac
 Please consider citing our work if the source code is helpful in your research.
 
 # 2. Reproduce important results of the paper
-A description on how to reproduce rasults from the paper will be added soon.
+The main figures of the paper can be reproduced by going through these sections:
 
 - section 2.1, download the data
 - section 2.2, download pre-made predictions and model weights
 - section 2.3, evaluate and produce plots
 - section 2.4, train models and make predictions (optional)
+
 
 ## 2.1 Download the data
 
