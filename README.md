@@ -40,9 +40,14 @@ A suggestion of commands to do so:
 The directory 'experiments/final_ensemble' will now contain the model weights for each model in the ensemble, and the predictions from each model for the validation data. To ensemble the predictions and evaluate continue to section 2.3. To make your own predictions skip to section 2.4.
 
 ## 2.3 Evaluate and produce plots
+Setup the environment using Anaconda:
 
-    mkdir notebooks/evals       # used to store .json files
-    jupyther notebook
+    conda create -n bioacoustics
+    conda activate bioacoustics
+    conda install --file requirements.txt
+    conda install -c conda-forge librosa mir_eval
+
+    jupyter notebook notebooks/results_notebook.ipynb
     
 Start the "results_notebook.ipynb", and run the code to produce figure 2, figure 3 and figure 4.
 
