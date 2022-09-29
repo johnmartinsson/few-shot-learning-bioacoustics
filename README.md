@@ -25,26 +25,16 @@ A suggestion of commands to do so:
     unzip Development_Set.zip
     mv Development_Set Development_Set_22050Hz # cp -r Development_Set Development_Set_22050Hz  # (if you want to keep a copy)
     sh resample.sh
-
-## Pre-process the data 
-
-    cd data
-    
-
-Resample.
-
-    cp -r Development_Set Development_Set_8000Hz
-    for i in Development_Set_8000Hz/*/*/*.wav; do sox $i -r 8000 tmp.wav; mv tmp.wav $i; done
     
 ## Download pre-trained model
 
-    TODO: add dropbox link
-    wget <dropboxlink>
+    wget https://www.dropbox.com/s/ad7jxb8z5b06tjd/final_ensemble.zip
     unzip final_ensemble.zip
 
 ## Evaluate pre-trained model
-TODO
 
+    jupyther notebook
+    
 ## Produce plots
 TODO
 
