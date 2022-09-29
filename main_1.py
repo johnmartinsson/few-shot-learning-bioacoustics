@@ -28,7 +28,7 @@ normalize_energy = False
 normalize_input = True
 nb_runs = 5
 
-mode = 'predict_test' # 'train'
+mode = sys.argv[2] # ['train', 'predict', 'predict_test']
 
 for window_size in [16384, 8192, 4096, 2048]:
     model_name = 'resnet_{}'.format(window_size)
