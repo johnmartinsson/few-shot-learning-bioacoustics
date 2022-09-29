@@ -7,6 +7,10 @@ The method came in third place among the team submissions in the [few-shot bioac
 
 Please consider citing our work if the source code is helpful in your research.
 
+Start by cloning the github-repo and make the root of the github-repo your working directory.
+
+    git clone https://github.com/johnmartinsson/dcase-bioacoustics-2022.git
+
 # 2. Reproduce important results of the paper
 The main figures of the paper can be reproduced by going through these sections:
 
