@@ -34,7 +34,15 @@ class PrototypeDataset(torch.utils.data.Dataset):
                     print("expand")
                     start_expand = int(np.floor(to_expand/2))
                     end_expand = int(np.ceil(to_expand/2))
-                    wave_segment = wave[start_idx-start_expand:end_idx+end_expand]
+
+                    if start_idx-start_expand < 0: # if we move outside of the wave, append zeros
+                        print("{}, expanding outside of wave.".format(start_idx-start_expand))
+                        start_zeros = np.abs(start_idx - start_expand)
+                        wave_segment = np.concatenate((np.zeros(start_zeros), wave[0:end_idx+end_expand]))
+                        assert(len(wave_segment) == window_size)
+                    else:
+                        wave_segment = wave[start_idx-start_expand:end_idx+end_expand]
+                        assert(len(wave_segment) == window_size)
                 elif padding == 'zeros':
                     print("zeros")
                     wave_segment = wave[start_idx:end_idx]

@@ -183,7 +183,7 @@ def predict(experiment_dir, csv_paths, conf, save_probas=False, verbose=False):
         if save_probas:
             basename = os.path.basename(csv_path).split('.')[0]
             prediction_path = os.path.join(experiment_dir, 'predictions', '{}_predictions_hop_size_{}.npy'.format(basename, hop_size))
-            times_path = os.path.join(experiment_dir, 'predictions', '{}_times_hop_size{}.npy'.format(basename, hop_size))
+            times_path = os.path.join(experiment_dir, 'predictions', '{}_times_hop_size_{}.npy'.format(basename, hop_size))
             #base_prediction_path = os.path.join(experiment_dir, 'predictions', '{}_base_predictions.npy'.format(basename))
             # save predictions
             if not os.path.exists(os.path.dirname(prediction_path)):
