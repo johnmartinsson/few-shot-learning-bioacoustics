@@ -1,0 +1,6 @@
+pytorch-gpu
+tqdm
+numpy
+pandas
+scipy
+jupyter
