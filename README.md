@@ -46,6 +46,8 @@ The directory 'experiments/final_ensemble' will now contain the model weights fo
     
 Start the "results_notebook.ipynb", and run the code to produce figure 2, figure 3 and figure 4.
 
+The final challenge submissions for the test data can also be computed using this notebook.
+
 ## 2.4 Train models and make predictions
 Assuming you have access to three GPU:s, a simple way to train the ensemble would be:
 
@@ -55,10 +57,16 @@ Assuming you have access to three GPU:s, a simple way to train the ensemble woul
     
 the models should be in the 'experiments/final_ensemble' directory. There are five different runs for each time-frequency transform, each containing a trained model, the difference is explained in the paper, but shortly they have been trained on different train/val split of the base training dataset and with different random seeds. 
 
-The next step is to make the predictions. Which can be done by:
+The next step is to make the validation data predictions (assumes that you have done section 2.1). Which can be done by:
 
     CUDA_VISIBLE_DEVICES=0 python main.py pcen_speech predict
     CUDA_VISIBLE_DEVICES=1 python main.py pcen_biodiversity predict
     CUDA_VISIBLE_DEVICES=2 python main.py decibel predict
 
 this will loop over each of the five models for each time-frequency transform, and compute the embeddings for the support for each validation file and then infer the class probabilities for the unannotated parts of each validation file which are stored in the directory "predictions". These can then be evaluated separately or as an ensemble (see section 2.3).
+
+To make the test data predictions:
+
+    CUDA_VISIBLE_DEVICES=0 python main.py pcen_speech predict_test
+    CUDA_VISIBLE_DEVICES=1 python main.py pcen_biodiversity predict_test
+    CUDA_VISIBLE_DEVICES=2 python main.py decibel predict_test
