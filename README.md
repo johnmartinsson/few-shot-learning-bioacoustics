@@ -33,7 +33,7 @@ A suggestion of commands to do so:
 
 ## Evaluate pre-trained model
 
-    mkdir evals         # used to store .json files
+    mkdir notebooks/evals       # used to store .json files
     jupyther notebook
     
 ## Produce plots
