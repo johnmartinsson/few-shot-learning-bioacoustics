@@ -12,10 +12,11 @@ A description on how to reproduce rasults from the paper will be added soon.
 
 ## Download the data
 
-Simple download the data into the ./data directory, extract the data from the zip file, rename the directory, and resample all the audio data to 22050Hz __in-place__.
-
-If you want to keep a copy of the original data, simply copy the data and resample instead of moving it.
-
+We will
+- download the challenge data into the ./data directory, 
+- extract the data from the zip file, 
+- rename (or copy) the directory, 
+- and resample all the audio data to 22050Hz __in-place__.
 
     cd data
     wget https://zenodo.org/record/6482837/files/Development_Set.zip
