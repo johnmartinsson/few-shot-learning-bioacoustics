@@ -1,4 +1,4 @@
-# Evaluate "pattern matching" in Arbimon on DCASE 2022
+# Evaluate pattern matching in Arbimon on DCASE 2022
 
 This is an evaluation of the pattern matching method in Arbimon on the DCASE
 2022 dataset.
