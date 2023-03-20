@@ -35,7 +35,13 @@ I simply create a job for each template [shot_1, shot_2, ..., shot_5], and [shot
 
 ## Evaluation
 
-A positive detection by a template is defined as a score higher than a pre-defined threshold. Each template makes a vote for each query on whether or not it contains a positive event.
+We evaluate compared to the few-shot bioacoustic event detection validation data of the DCASE 2023 challenge, and compute
+
+- precision,
+- recall, and
+- F-score
+
+for two different methods.
 
 ### Method 1
 
