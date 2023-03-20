@@ -29,6 +29,6 @@ This is an example for the ME1.wav file.
 
 ## Query in Arbimon
 
-I simply create a job for each template [shot_1, shot_2, ..., shot_5], and [shot_1_tight, shot_2_tight, ..., shot_5_tight] for the corresponding file, e.g., ME1.wav, where the maximum number of detections per file is set to N=100000000, and the threshold is set to threshold=0.0. This is just so that we get all the queries with scores in the results. The results is exported as a .csv.
+I simply create a job for each template [shot_1, shot_2, ..., shot_5], and [shot_1_tight, shot_2_tight, ..., shot_5_tight] for the corresponding file, e.g., ME1.wav, where the maximum number of detections per file is set to N=100000000, and the threshold is set to threshold=0.0. This means that we get all the queries with corresponding scores in the results. The results are exported as a .csv.
 
 ![ME1 Arbimon annotations](./figures/ME1_arbimon_jobs.png)
