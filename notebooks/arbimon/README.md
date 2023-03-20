@@ -44,3 +44,9 @@ Each template scores each query, a positive detection is defined as a query for 
 ### Method 2
 
 Each template scores each query, and for each query we average the scores. A positive detection is defined as a query with an average score higher than a given threshold.
+
+
+### Results 1
+
+
+### Results 2
