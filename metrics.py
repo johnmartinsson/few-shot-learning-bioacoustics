@@ -1,7 +1,12 @@
 import numpy as np
 import mir_eval
 import scipy
-
+######################################################################################################################
+# CREDIT STATEMENT
+######################################################################################################################
+# This evaluation code is from: https://github.com/c4dm/dcase-few-shot-bioacoustic/blob/main/evaluation_metrics/metrics.py
+# The code has not been written by me, and all credit goes to the original authors.
+######################################################################################################################
 
 def fast_intersect(ref, est):
     """Find all intersections between reference events and estimated events (fast).
