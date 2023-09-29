@@ -18,6 +18,13 @@ PRED_FILE_HEADER = ["Audiofilename","Starttime","Endtime"]
 POS_VALUE = 'POS'
 UNK_VALUE = 'UNK'
 
+######################################################################################################################
+# CREDIT STATEMENT
+######################################################################################################################
+# This evaluation code is from: https://github.com/c4dm/dcase-few-shot-bioacoustic/blob/main/evaluation_metrics/evaluation.py
+# The code has been modified to suit my needs, but I am not the main author of the code. All credit goes to the original authors.
+######################################################################################################################
+
 def remove_shots_from_ref(ref_df, number_shots=5):
     
     ref_pos_indexes = select_events_with_value(ref_df, value=POS_VALUE)
