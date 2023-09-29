@@ -6,6 +6,13 @@ import scipy
 ######################################################################################################################
 # This evaluation code is from: https://github.com/c4dm/dcase-few-shot-bioacoustic/blob/main/evaluation_metrics/metrics.py
 # The code has not been written by me, and all credit goes to the original authors.
+#
+# The evaluation algorithm was presented at DCASE 2023 in the paper:
+#
+#     Vincent Lostanlen, Brian Mcfee. Efficient Evaluation Algorithms for Sound Event Detection. 
+#     8th Workshop on Detection and Classification of Acoustic Scenes and Events (DCASE 2023), 
+#     Oct 2023, Tampere, Finland. ⟨hal-04180328v3⟩
+#
 ######################################################################################################################
 
 def fast_intersect(ref, est):
