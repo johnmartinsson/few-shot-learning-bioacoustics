@@ -1,3 +1,31 @@
+# MIT License
+
+# Copyright (c) 2022 Centre for Digital Music
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+######################################################################################################################
+# CREDIT STATEMENT
+######################################################################################################################
+# This evaluation code is from: https://github.com/c4dm/dcase-few-shot-bioacoustic/blob/main/evaluation_metrics/evaluation.py
+# The code has been modified to suit my needs, but I am not the main author of the code. All credit goes to the original authors.
+######################################################################################################################
 
 import pandas as pd
 import argparse
@@ -18,12 +46,7 @@ PRED_FILE_HEADER = ["Audiofilename","Starttime","Endtime"]
 POS_VALUE = 'POS'
 UNK_VALUE = 'UNK'
 
-######################################################################################################################
-# CREDIT STATEMENT
-######################################################################################################################
-# This evaluation code is from: https://github.com/c4dm/dcase-few-shot-bioacoustic/blob/main/evaluation_metrics/evaluation.py
-# The code has been modified to suit my needs, but I am not the main author of the code. All credit goes to the original authors.
-######################################################################################################################
+
 
 def remove_shots_from_ref(ref_df, number_shots=5):
     
