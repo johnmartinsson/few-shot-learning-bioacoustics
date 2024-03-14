@@ -1,9 +1,7 @@
 # 1. DCASE bioacoustics 2022
-The official repository for the source code of the method presented in the paper:
+The official implementation of the method in the paper "Few-shot bioacoustic event detection using an event-length adapted ensemble of prototypical networks".
 
-    Martinsson, J., Willbo, M., Pirinen, A., Mogren, O., & Sandsten, M. (2022). Few-shot bioacoustic event detection using an event-length adapted ensemble of prototypical networks. In The 7th Workshop on Detection and Classification of Acoustic Scenes and Events (pp. 2–6).
-    
-with bibtex entry
+Cite as
 
     @inproceedings{Martinsson2022,
         author = {Martinsson, John and Willbo, Martin and Pirinen, Aleksis and Mogren, Olof and Sandsten, Maria},
