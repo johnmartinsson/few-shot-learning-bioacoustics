@@ -1,4 +1,7 @@
-# 1. DCASE bioacoustics 2022
+# 1. Few-shot bioacoustic event detection using an event-length adapted ensemble of prototypical networks
+
+![Method illustration](figures/illustration.png)
+
 The official implementation of the method in the paper "Few-shot bioacoustic event detection using an event-length adapted ensemble of prototypical networks".
 
 Cite as
