@@ -2,7 +2,7 @@
 
 ![Method illustration](figures/illustration.png)
 
-The official implementation of the method in the paper "Few-shot bioacoustic event detection using an event-length adapted ensemble of prototypical networks".
+The official implementation of the method in the paper [Few-shot bioacoustic event detection using an event-length adapted ensemble of prototypical networks](https://dcase.community/documents/workshop2022/proceedings/DCASE2022Workshop_Martinsson_13.pdf).
 
 Cite as
 
